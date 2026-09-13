@@ -1,0 +1,78 @@
+{
+  "formatVersion": 1,
+  "id": "gtsnponder:coke_oven",
+  "title": "ponder.gtsnponder.coke_oven.title",
+  "target": "gtceu:coke_oven",
+  "variant": "default",
+  "source": "hand",
+  "generatorVersion": "hand-1",
+  "elements": [
+    {
+      "id": "base",
+      "kind": "section",
+      "params": { "selector": "layer", "y": 0 }
+    },
+    {
+      "id": "shell",
+      "kind": "section",
+      "params": { "selector": "all" }
+    },
+    {
+      "id": "controller",
+      "kind": "anchor",
+      "params": { "selector": "controller" }
+    }
+  ],
+  "steps": [
+    {
+      "id": "reveal_base",
+      "type": "showSection",
+      "duration": 25,
+      "targets": ["base"]
+    },
+    {
+      "id": "talk_intro",
+      "type": "text",
+      "duration": 40,
+      "narration": "ponder.gtsnponder.coke_oven.narration.intro"
+    },
+    {
+      "id": "reveal_shell",
+      "type": "showSection",
+      "duration": 25,
+      "targets": ["shell"]
+    },
+    {
+      "id": "frame",
+      "type": "camera",
+      "duration": 0,
+      "targets": ["controller"],
+      "params": { "yaw": 25.0, "pitch": -135.0, "distance": 6.0 }
+    },
+    {
+      "id": "highlight_controller",
+      "type": "highlight",
+      "duration": 30,
+      "targets": ["controller"],
+      "params": { "visible": true }
+    },
+    {
+      "id": "talk_controller",
+      "type": "text",
+      "duration": 50,
+      "narration": "ponder.gtsnponder.coke_oven.narration.controller"
+    },
+    {
+      "id": "talk_usage",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.coke_oven.narration.usage"
+    },
+    {
+      "id": "formed",
+      "type": "formedPulse",
+      "duration": 20,
+      "targets": ["controller"]
+    }
+  ]
+}

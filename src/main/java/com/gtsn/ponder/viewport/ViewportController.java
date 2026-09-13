@@ -43,6 +43,16 @@ public final class ViewportController {
         zoom = DEFAULT_ZOOM;
     }
 
+    /**
+     * 直接设定相机位姿（场景 {@code CameraState} → 视口相机）。角度 / 缩放按与拖拽 / 滚轮
+     * 相同的规则钳制，随后用户重新拖拽 / 缩放会从该位姿继续。
+     */
+    public void set(double rotationYaw, double rotationPitch, double zoom) {
+        this.rotationYaw = clamp(rotationYaw, -YAW_LIMIT, YAW_LIMIT);
+        this.rotationPitch = rotationPitch;
+        this.zoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    }
+
     /** 指针按下：主键（0）开始拖拽并返回 {@code true}，其它键返回 {@code false}。 */
     public boolean press(double localX, double localY, int button) {
         lastLocalX = localX;

@@ -1,0 +1,21 @@
+{
+  "key.categories.gtsnponder": "GTSN Ponder",
+  "key.gtsnponder.ponder": "Open Ponder",
+
+  "ponder.gtsnponder.coke_oven.title": "Coke Oven",
+  "ponder.gtsnponder.coke_oven.narration.intro": "This is the coke oven: a 3x3x3 multiblock that turns coal into coke.",
+  "ponder.gtsnponder.coke_oven.narration.controller": "The controller sits in the front-center. Power it to form the structure.",
+  "ponder.gtsnponder.coke_oven.narration.usage": "Feed coal from the top, then collect coke and creosote from the output hatch.",
+
+  "ponder.gtsnponder.player.title": "Ponder",
+  "ponder.gtsnponder.control.prev": "Prev",
+  "ponder.gtsnponder.control.play": "Play",
+  "ponder.gtsnponder.control.pause": "Pause",
+  "ponder.gtsnponder.control.next": "Next",
+  "ponder.gtsnponder.control.replay": "Replay",
+  "ponder.gtsnponder.player.seekhint": "Click the bar to seek",
+
+  "ponder.gtsnponder.message.no_target": "No GT machine or multiblock in view (within reach).",
+  "ponder.gtsnponder.message.no_scene": "No ponder scene is registered for %s.",
+  "ponder.gtsnponder.message.no_world": "Join a world before opening ponder."
+}

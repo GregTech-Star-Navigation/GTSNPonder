@@ -21,50 +21,66 @@ public final class FakeSceneWorld implements SceneWorld {
     private final Map<String, String> modules = new LinkedHashMap<>();
     private final List<String> formedPulses = new ArrayList<>();
     private final List<String> particles = new ArrayList<>();
+    /** 诊断用、追加式的效果调用日志（不参与 {@link FakeState} 比较，仅供断言触发顺序）。 */
+    private final List<String> events = new ArrayList<>();
 
     @Override
     public void setSectionVisible(String sectionId, boolean visible) {
         sections.put(sectionId, visible);
+        events.add("section:" + sectionId + "=" + visible);
     }
 
     @Override
     public void replaceBlocks(String elementId, String blockId) {
         blocks.put(elementId, blockId);
+        events.add("replace:" + elementId + "=" + blockId);
     }
 
     @Override
     public void setHighlight(String targetId, boolean active) {
         highlights.put(targetId, active);
+        events.add("highlight:" + targetId + "=" + active);
     }
 
     @Override
     public void setOutline(String targetId, boolean active) {
         outlines.put(targetId, active);
+        events.add("outline:" + targetId + "=" + active);
     }
 
     @Override
     public void setNarration(String narrationKey) {
         this.narration = narrationKey;
+        events.add("narration:" + narrationKey);
     }
 
     @Override
     public void setCamera(CameraState camera) {
         this.camera = camera;
+        events.add("camera:" + (camera == null ? null : camera.targetId()));
     }
 
     @Override
     public void installModule(String slotId, String moduleId) {
         modules.put(slotId, moduleId);
+        events.add("module:" + slotId + "=" + moduleId);
     }
 
     @Override
     public void pulseFormed(String controllerId) {
         formedPulses.add(controllerId);
+        events.add("formed:" + controllerId);
     }
 
     @Override
     public void emitParticles(String targetId) {
         particles.add(targetId);
+        events.add("particles:" + targetId);
+    }
+
+    /** 有序的效果调用日志（首次触发 / 重放都会追加，属诊断信息）。 */
+    public List<String> events() {
+        return List.copyOf(events);
     }
 
     @Override

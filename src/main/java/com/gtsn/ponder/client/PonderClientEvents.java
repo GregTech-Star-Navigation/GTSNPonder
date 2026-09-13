@@ -1,0 +1,59 @@
+package com.gtsn.ponder.client;
+
+import com.gtsn.ponder.GTSNPonder;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.commands.Commands;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RegisterClientCommandsEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
+
+/**
+ * 客户端接线（Forge 事件总线）：
+ *
+ * <ul>
+ *   <li>客户端命令 {@code /gtsnponder scene [target]}（本地执行、不发往服务器）——自动测试与
+ *       无快捷键场景的确定性入口；</li>
+ *   <li>每客户端 tick：推进当前 {@link ScenePlayerScreen}（若存在），并消费快捷键点击
+ *       （仅在无界面时打开，避免与已打开界面冲突）。</li>
+ * </ul>
+ *
+ * <p>客户端专用类（由 {@code Dist.CLIENT} 订阅保证专职服务端不加载）。</p>
+ */
+@Mod.EventBusSubscriber(modid = GTSNPonder.MODID, bus = Bus.FORGE, value = Dist.CLIENT)
+public final class PonderClientEvents {
+
+    private PonderClientEvents() {
+    }
+
+    @SubscribeEvent
+    public static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+        event.getDispatcher().register(Commands.literal("gtsnponder")
+                .then(Commands.literal("scene")
+                        .executes(context -> PonderEntrypoints.openForLookedAtTarget() ? 1 : 0)
+                        .then(Commands.argument("target", StringArgumentType.string())
+                                .executes(context -> PonderEntrypoints.openForTarget(
+                                        StringArgumentType.getString(context, "target")) ? 1 : 0))));
+    }
+
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof ScenePlayerScreen screen) {
+            screen.advance();
+        }
+        int presses = 0;
+        while (PonderEntrypoints.PONDER_KEY.consumeClick()) {
+            presses++;
+        }
+        if (presses > 0 && minecraft.screen == null) {
+            PonderEntrypoints.openForLookedAtTarget();
+        }
+    }
+}

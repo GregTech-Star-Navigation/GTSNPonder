@@ -37,6 +37,7 @@ GitHub Issues（`gh` CLI），仓库 `GregTech-Star-Navigation/GTSNPonder`。见
 .\gradlew.bat runGameTestServer   # 运行 GameTest（forge.enabledGameTestNamespaces=gtsnponder）
 .\gradlew.bat publishToMavenLocal # 发布 reobf 变体到 ~/.m2（供下游 mod 以 modImplementation 消费）
 $env:GTSNPONDER_UI_AUTOTEST="viewport"; .\gradlew.bat runClient  # 视口嵌入自动测试（#4）：载入存档 → 渲染真实 GT 多方块 → 拖拽/缩放/覆盖层点击/resize 断言 → 截图 run/screenshots/gtsnponder-viewport.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="scene"; .\gradlew.bat runClient  # 场景播放自动测试（#5）：载入存档 → 打开 gtceu:coke_oven 的思索屏 → 步骤/旁白/暂停/seek/重播断言 → 截图 run/screenshots/gtsnponder-scene.png → 退出（用后清除该环境变量）
 ```
 
 ### 依赖与类加载纪律

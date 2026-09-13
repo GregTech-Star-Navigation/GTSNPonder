@@ -21,6 +21,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
+import org.joml.Vector3f;
+
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +53,8 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
     private final StructureSource structure;
     private final SceneWidget sceneWidget;
     private final ViewportController controller = new ViewportController();
+    /** 结构包围盒中心（首次 {@code setRenderedCore} 后捕获），分段显隐时保持取景不漂移。 */
+    private final Vector3f fixedCenter;
 
     private Rect bounds = Rect.ZERO;
     private float partialTick;
@@ -61,6 +66,8 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
     private LdlibSceneViewport(StructureSource structure, SceneWidget sceneWidget) {
         this.structure = structure;
         this.sceneWidget = sceneWidget;
+        Vector3f center = sceneWidget.getCenter();
+        this.fixedCenter = center == null ? new Vector3f(0.0f, 0.0f, 0.0f) : new Vector3f(center);
         applyCamera();
     }
 
@@ -217,6 +224,33 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
     public void resetCamera() {
         controller.reset();
         applyCamera();
+    }
+
+    /** 底层 LDLib 虚世界（世界桥据此增删 / 替换方块）。 */
+    public TrackedDummyWorld dummyWorld() {
+        return sceneWidget.getDummyWorld();
+    }
+
+    /**
+     * 设定当前应渲染的方块集合（分段显隐）。LDLib 渲染由「已渲染集合」驱动，未在集合内的坐标
+     * {@code getBlockState} 返回空气、不绘制；取景中心固定为结构包围盒中心（避免分段增减时画面
+     * 漂移），相机角度 / 缩放保持不变。
+     */
+    public void setVisibleBlocks(Collection<BlockPos> positions) {
+        sceneWidget.setRenderedCore(positions);
+        sceneWidget.setCenter(fixedCenter);
+        applyCamera();
+    }
+
+    /** 应用场景 {@code CameraState}（yaw / pitch / distance）到视口相机。 */
+    public void applySceneCamera(double yaw, double pitch, double zoom) {
+        controller.set(yaw, pitch, zoom);
+        applyCamera();
+    }
+
+    /** 场景内高亮 / 轮廓绘制所需的底层控件（世界桥在 {@code afterWorldRender} 钩子中画边框）。 */
+    public SceneWidget sceneWidgetForOverlay() {
+        return sceneWidget;
     }
 
     /** 把纯状态机的角度 / 缩放机械映射到 LDLib 控件。 */
