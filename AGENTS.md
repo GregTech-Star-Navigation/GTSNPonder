@@ -5,6 +5,7 @@ GTSNPonder 是 **GTSN（GregTech Star Navigation）** 项目群的「思索」mo
 - 全局偏好见 `~/.config/opencode/AGENTS.md`
 - 领域词汇见 `CONTEXT.md`；架构决策见 `docs/adr/`
 - **硬性约束见 `docs/constraints.md`**（随规格落地：依赖版本区间 / GT import 隔离 / 类加载纪律 / 发布与提交规则）
+- **视口嵌入契约见 `docs/viewport-embedding.md`**（GTSN UI × LDLib：输入 / 裁剪 / z 序 / resize / partial-tick）
 
 ## Agent skills
 
@@ -35,6 +36,7 @@ GitHub Issues（`gh` CLI），仓库 `GregTech-Star-Navigation/GTSNPonder`。见
 .\gradlew.bat runData             # 数据生成，输出到 src/generated/resources/
 .\gradlew.bat runGameTestServer   # 运行 GameTest（forge.enabledGameTestNamespaces=gtsnponder）
 .\gradlew.bat publishToMavenLocal # 发布 reobf 变体到 ~/.m2（供下游 mod 以 modImplementation 消费）
+$env:GTSNPONDER_UI_AUTOTEST="viewport"; .\gradlew.bat runClient  # 视口嵌入自动测试（#4）：载入存档 → 渲染真实 GT 多方块 → 拖拽/缩放/覆盖层点击/resize 断言 → 截图 run/screenshots/gtsnponder-viewport.png → 退出（用后清除该环境变量）
 ```
 
 ### 依赖与类加载纪律
