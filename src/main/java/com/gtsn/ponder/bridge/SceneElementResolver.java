@@ -3,11 +3,13 @@ package com.gtsn.ponder.bridge;
 import com.gtsn.ponder.engine.model.SceneElement;
 import com.gtsn.ponder.engine.model.SceneParams;
 import com.gtsn.ponder.structure.StructureBlock;
+import com.gtsn.ponder.structure.StructureRole;
 import com.gtsn.ponder.structure.StructureSource;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -23,7 +25,9 @@ import java.util.Objects;
  *   <li>{@code all}（缺省）：结构全部方块；</li>
  *   <li>{@code controller}：多方块控制器单元（{@link StructureSource#hasController()} 为假时为空）；</li>
  *   <li>{@code block}：{@code params.block} 指定的方块注册名（缺参数时为空）；</li>
- *   <li>{@code layer}：{@code params.y} 指定的结构局部 Y 层（缺参数时为空）。</li>
+ *   <li>{@code layer}：{@code params.y} 指定的结构局部 Y 层（缺参数时为空）；</li>
+ *   <li>{@code role}：{@code params.role} 指定的 {@link StructureRole} 名（大小写不敏感；缺参数 / 未知角色时为空）。
+ *       可选 {@code params.limit}（正整数）把结果截断为确定性前 N 个单元，用于收敛高亮轮廓数量。</li>
  * </ul>
  *
  * <p>纯 Java：不依赖 Minecraft 或格雷科技，可 headless 单测（导演核心纪律的延伸）。</p>
@@ -38,6 +42,8 @@ public final class SceneElementResolver {
     public static final String SELECTOR_BLOCK = "block";
     /** 选择器字面量：按结构局部 Y 层过滤（参数 {@code y}）。 */
     public static final String SELECTOR_LAYER = "layer";
+    /** 选择器字面量：按方块角色过滤（参数 {@code role}，取 {@link StructureRole} 名，大小写不敏感）。 */
+    public static final String SELECTOR_ROLE = "role";
 
     private final StructureSource structure;
 
@@ -60,6 +66,9 @@ public final class SceneElementResolver {
             case SELECTOR_CONTROLLER -> resolveController();
             case SELECTOR_BLOCK -> resolveBlock(SceneParams.string(element.params(), "block", null));
             case SELECTOR_LAYER -> resolveLayer(SceneParams.number(element.params(), "y", Double.NaN));
+            case SELECTOR_ROLE -> resolveRole(
+                    SceneParams.string(element.params(), "role", null),
+                    SceneParams.number(element.params(), "limit", 0.0d));
             default -> List.of();
         };
     }
@@ -110,6 +119,29 @@ public final class SceneElementResolver {
         for (StructureBlock block : structure.blocks()) {
             if (block.y() == layer) {
                 matches.add(block);
+            }
+        }
+        return List.copyOf(matches);
+    }
+
+    private List<StructureBlock> resolveRole(String roleName, double rawLimit) {
+        if (roleName == null || roleName.isBlank()) {
+            return List.of();
+        }
+        StructureRole role;
+        try {
+            role = StructureRole.valueOf(roleName.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException unknownRole) {
+            return List.of();
+        }
+        int limit = rawLimit > 0.0d && rawLimit == Math.rint(rawLimit) ? (int) rawLimit : 0;
+        List<StructureBlock> matches = new ArrayList<>();
+        for (StructureBlock block : structure.blocks()) {
+            if (block.role() == role) {
+                matches.add(block);
+                if (limit > 0 && matches.size() >= limit) {
+                    break;
+                }
             }
         }
         return List.copyOf(matches);

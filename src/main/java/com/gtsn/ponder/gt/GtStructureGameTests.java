@@ -1,6 +1,12 @@
 package com.gtsn.ponder.gt;
 
 import com.gtsn.ponder.GTSNPonder;
+import com.gtsn.ponder.bridge.SceneElementResolver;
+import com.gtsn.ponder.engine.model.SceneData;
+import com.gtsn.ponder.engine.model.SceneDataWriter;
+import com.gtsn.ponder.engine.model.SceneElement;
+import com.gtsn.ponder.engine.model.Source;
+import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.structure.HatchClassifier;
 import com.gtsn.ponder.structure.StructureBlock;
 import com.gtsn.ponder.structure.StructureRole;
@@ -308,6 +314,45 @@ public final class GtStructureGameTests {
                 "unknown machine id must yield empty");
         helper.assertTrue(GtStructureAdapter.byId("not a resource location").isEmpty(),
                 "malformed machine id must yield empty");
+        helper.succeed();
+    }
+
+    /**
+     * 自动生成器在真实 GT 多方块上可产出<b>可播放</b>（每个元素都解析到方块）且<b>确定性</b>
+     * （两次生成字节相等 JSON）的场景。选取小 / 中 / 大三台代表机器，验证自动生成缝在真实数据上成立。
+     */
+    @GameTest(template = "empty")
+    public static void generatorProducesDeterministicSceneForRealMultiblocks(GameTestHelper helper) {
+        List<String> ids = List.of(
+                "gtceu:coke_oven", "gtceu:electric_blast_furnace", "gtceu:large_chemical_reactor");
+        int checked = 0;
+        for (String id : ids) {
+            StructureSource source = GtStructureAdapter.byId(id).orElse(null);
+            if (source == null || source.isEmpty()) {
+                continue;
+            }
+            SceneData scene = SceneGenerator.generate(source);
+            helper.assertTrue(scene.source() == Source.AUTO, "generated source must be auto for " + id);
+            helper.assertTrue(SceneGenerator.GENERATOR_VERSION.equals(scene.generatorVersion()),
+                    "generatorVersion missing for " + id);
+            helper.assertTrue(!scene.steps().isEmpty(), "no steps generated for " + id);
+            helper.assertTrue(SceneDataWriter.toJson(scene)
+                            .equals(SceneDataWriter.toJson(SceneGenerator.generate(source))),
+                    "generation is not deterministic for " + id);
+
+            SceneElementResolver resolver = new SceneElementResolver(source);
+            for (SceneElement element : scene.elements()) {
+                helper.assertTrue(!resolver.resolve(element).isEmpty(),
+                        "element '" + element.id() + "' resolves to nothing for " + id);
+            }
+            // 逐层 / 角色分组由方块数决定，两者都必须产出非空构建序列。
+            long buildSteps = scene.steps().stream()
+                    .filter(step -> step.id().startsWith("build.layer.") || step.id().startsWith("build.role."))
+                    .count();
+            helper.assertTrue(buildSteps > 0, "no build step generated for " + id);
+            checked++;
+        }
+        helper.assertTrue(checked > 0, "no real multiblock could be auto-generated (GT loaded?)");
         helper.succeed();
     }
 

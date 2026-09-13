@@ -37,7 +37,8 @@ class SceneDataParserTest {
                       "futureStepKey": 42
                     },
                     { "id": "s2", "type": "totallyUnknownFutureStep", "duration": 5, "targets": ["anchor_ctrl"] },
-                    { "id": "s3", "type": "text", "duration": 0, "narration": "ponder.gtceu.test.narration" }
+                    { "id": "s3", "type": "text", "duration": 0, "narration": "ponder.gtceu.test.narration",
+                      "narrationArgs": ["Test Machine", "3x4x3"] }
                   ]
                 }
                 """;
@@ -70,6 +71,7 @@ class SceneDataParserTest {
         assertEquals("s3", second.id());
         assertEquals(StepType.TEXT, second.type());
         assertEquals("ponder.gtceu.test.narration", second.narration());
+        assertEquals(List.of("Test Machine", "3x4x3"), second.narrationArgs());
     }
 
     @Test

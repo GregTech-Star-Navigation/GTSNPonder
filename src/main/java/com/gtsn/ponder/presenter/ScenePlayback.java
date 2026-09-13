@@ -7,6 +7,7 @@ import com.gtsn.ponder.engine.model.SceneStep;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 表现层的时间轴绑定（纯 Java，可 headless 单测）：把 {@link SceneRunner} 的原始状态
@@ -100,13 +101,28 @@ public final class ScenePlayback {
 
     /** 第 {@code index} 步及之前最近一次旁白键；无则 {@code null}。 */
     public String narrationKeyAt(int index) {
+        return narrationStepAt(index).map(SceneStep::narration).orElse(null);
+    }
+
+    /** 当前旁白键的模板参数（无旁白时为 <b>空列表</b>）。 */
+    public List<String> narrationArgs() {
+        return narrationArgsAt(stepIndex());
+    }
+
+    /** 第 {@code index} 步及之前最近一次旁白键的模板参数；无则空列表。 */
+    public List<String> narrationArgsAt(int index) {
+        return narrationStepAt(index).map(SceneStep::narrationArgs).orElse(List.of());
+    }
+
+    /** 第 {@code index} 步及之前最近一个声明了旁白键的步骤。 */
+    private Optional<SceneStep> narrationStepAt(int index) {
         List<SceneStep> steps = scene().steps();
         for (int i = Math.min(index, steps.size() - 1); i >= 0; i--) {
             if (steps.get(i).narration() != null) {
-                return steps.get(i).narration();
+                return Optional.of(steps.get(i));
             }
         }
-        return null;
+        return Optional.empty();
     }
 
     public void play() {

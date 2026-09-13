@@ -2,6 +2,7 @@ package com.gtsn.ponder.bridge;
 
 import com.gtsn.ponder.engine.model.SceneElement;
 import com.gtsn.ponder.structure.StructureBlock;
+import com.gtsn.ponder.structure.StructureRole;
 import com.gtsn.ponder.structure.StructureSource;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +40,19 @@ class SceneElementResolverTest {
         return StructureSource.builder("gtceu:no_controller")
                 .size(1, 1, 1)
                 .addBlock(0, 0, 0, "gtceu:test_casing")
+                .build();
+    }
+
+    /** 显式角色夹具：控制器 / 外壳 / 物品输入总线 / 流体输出仓各一。 */
+    private static StructureSource withRoles() {
+        return StructureSource.builder("gtceu:role_machine")
+                .displayName("Role Machine")
+                .size(2, 1, 2)
+                .controller(0, 0, 0)
+                .addBlock(0, 0, 0, "gtceu:test_controller", StructureRole.CONTROLLER)
+                .addBlock(1, 0, 0, "gtceu:test_casing", StructureRole.PLAIN)
+                .addBlock(0, 0, 1, "gtceu:input_bus", StructureRole.ITEM_INPUT)
+                .addBlock(1, 0, 1, "gtceu:output_hatch", StructureRole.FLUID_OUTPUT)
                 .build();
     }
 
@@ -112,6 +126,43 @@ class SceneElementResolverTest {
         assertEquals(6, base.size());
         assertTrue(base.stream().allMatch(block -> block.y() == 0));
         assertEquals(List.of(new StructureBlock(1, 1, 1, "gtceu:test_casing")), top);
+    }
+
+    @Test
+    void roleSelectorFiltersByStructureRole() {
+        SceneElementResolver resolver = new SceneElementResolver(withRoles());
+
+        List<StructureBlock> itemInput = resolver.resolve(SceneElement.of("hatch_input", "anchor",
+                Map.of("selector", "role", "role", "ITEM_INPUT")));
+        List<StructureBlock> shell = resolver.resolve(SceneElement.of("shell", "section",
+                Map.of("selector", "role", "role", "PLAIN")));
+
+        assertEquals(List.of(new StructureBlock(0, 0, 1, "gtceu:input_bus", StructureRole.ITEM_INPUT)), itemInput);
+        assertEquals(1, shell.size());
+        assertTrue(shell.stream().allMatch(block -> block.role() == StructureRole.PLAIN));
+    }
+
+    @Test
+    void roleSelectorIsCaseInsensitive() {
+        SceneElementResolver resolver = new SceneElementResolver(withRoles());
+
+        assertEquals(1, resolver.resolve(SceneElement.of("c", "anchor",
+                Map.of("selector", "role", "role", "controller"))).size());
+    }
+
+    @Test
+    void roleSelectorWithoutRoleParamIsEmpty() {
+        SceneElementResolver resolver = new SceneElementResolver(withRoles());
+
+        assertTrue(resolver.resolve(SceneElement.of("x", "section", Map.of("selector", "role"))).isEmpty());
+    }
+
+    @Test
+    void roleSelectorWithUnknownRoleIsEmpty() {
+        SceneElementResolver resolver = new SceneElementResolver(withRoles());
+
+        assertTrue(resolver.resolve(SceneElement.of("x", "section",
+                Map.of("selector", "role", "role", "NOT_A_ROLE"))).isEmpty());
     }
 
     @Test

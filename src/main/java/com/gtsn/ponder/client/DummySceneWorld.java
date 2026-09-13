@@ -306,12 +306,16 @@ public final class DummySceneWorld implements SceneWorld {
     }
 
     private void drawOverlays(SceneWidget widget) {
+        // 控制器高亮：画全 6 面形成金色线框盒，保证从任意相机角度都能读到（单面在侧视时会被压扁）。
         if (!highlightedPositions.isEmpty()) {
             PoseStack poseStack = new PoseStack();
             for (BlockPos pos : highlightedPositions) {
-                widget.drawFacingBorder(poseStack, new BlockPosFace(pos, Direction.UP), HIGHLIGHT_COLOR);
+                for (Direction face : Direction.values()) {
+                    widget.drawFacingBorder(poseStack, new BlockPosFace(pos, face), HIGHLIGHT_COLOR);
+                }
             }
         }
+        // 仓口 / 总线轮廓：单面（顶面）蓝色细边框，数量由生成器收敛（≤ HATCH_OUTLINE_LIMIT）。
         if (!outlinedPositions.isEmpty()) {
             PoseStack poseStack = new PoseStack();
             for (BlockPos pos : outlinedPositions) {

@@ -150,6 +150,7 @@ public final class SceneDataParser {
                     .targets(readStringArray(step, "targets", stepId))
                     .params(readParams(step.get("params")))
                     .narration(optionalString(step, "narration"))
+                    .narrationArgs(readStringArray(step, "narrationArgs", stepId))
                     .keyframe(readParams(step.get("keyframe")))
                     .build());
         }

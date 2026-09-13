@@ -38,7 +38,23 @@ GitHub Issues（`gh` CLI），仓库 `GregTech-Star-Navigation/GTSNPonder`。见
 .\gradlew.bat publishToMavenLocal # 发布 reobf 变体到 ~/.m2（供下游 mod 以 modImplementation 消费）
 $env:GTSNPONDER_UI_AUTOTEST="viewport"; .\gradlew.bat runClient  # 视口嵌入自动测试（#4）：载入存档 → 渲染真实 GT 多方块 → 拖拽/缩放/覆盖层点击/resize 断言 → 截图 run/screenshots/gtsnponder-viewport.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="scene"; .\gradlew.bat runClient  # 场景播放自动测试（#5）：载入存档 → 打开 gtceu:coke_oven 的思索屏 → 步骤/旁白/暂停/seek/重播断言 → 截图 run/screenshots/gtsnponder-scene.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成自动测试（#7）：载入存档 → 解析小/中/大三台真实 GT 多方块 → 强制自动生成并播放 → 确定性断言 → 每台两张截图 run/screenshots/gtsnponder-autogen-<n>-<machine>-reveal.png 与 -formed.png（揭示中 / 成型）→ 退出（用后清除该环境变量）
 ```
+
+### 自动生成（#7）
+
+- 纯生成器 `com.gtsn.ponder.generate.SceneGenerator`：`StructureSource → SceneData`；`CELL_BUDGET=64`
+  以上切换「按角色分组 + LOD / 淡入」，否则逐层（Y 升序）；控制器优先、其后仓口 / 总线高亮；
+  成型演示 = 隐藏 → 重现 → 成型脉冲。产物 `source=auto` + `generatorVersion=auto-1`，确定性（同源两次
+  生成字节相等 JSON，由 `SceneDataWriter` 序列化）。
+- 运行时接线：`/gtsnponder scene <target>` 无手作场景时按需自动生成；`/gtsnponder generate <target>`
+  强制生成并播放；`/gtsnponder dump <target>` 导出生成 JSON 到 `run/gtsnponder-generated/`。
+- 取景：相机距离 = 包围盒对角线 × `FIT_FACTOR`（下限 `MIN_CAMERA_DISTANCE`），使结构占据视口主要区域；
+  相机步骤排在搭建之前（全程同一取景）。
+- 高亮可读：控制器金色**线框盒**（全 6 面），仓口 / 总线蓝色细轮廓（按角色分批、总数 ≤ `HATCH_OUTLINE_LIMIT=4`）；
+  旁白含颜色图例（`...narration.legend`，成型文案亦复述）。
+- 旁白机器特定：`narrationArgs` 模板参数（机器标识 / 结构尺寸 / 仓口数量与角色 / 模块位数量），中英双语键。
+- 人类评审门：自动生成的教学质量由人评审截图（`autogen` 自动测试产出），自动化只覆盖结构与确定性。
 
 ### 依赖与类加载纪律
 

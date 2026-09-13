@@ -15,8 +15,14 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
  * 客户端接线（Forge 事件总线）：
  *
  * <ul>
- *   <li>客户端命令 {@code /gtsnponder scene [target]}（本地执行、不发往服务器）——自动测试与
- *       无快捷键场景的确定性入口；</li>
+ *   <li>客户端命令（本地执行、不发往服务器）：
+ *       <ul>
+ *         <li>{@code /gtsnponder scene [target]}——无快捷键场景的确定性入口（有手作用手作，无则自动生成）；</li>
+ *         <li>{@code /gtsnponder generate <target>}——强制自动生成并播放（开发者 / 自动测试）；</li>
+ *         <li>{@code /gtsnponder dump <target>}——把自动生成的场景 JSON 导出到
+ *             {@code run/gtsnponder-generated/}（作者草稿起点 / 生成器 diff）。</li>
+ *       </ul>
+ *   </li>
  *   <li>每客户端 tick：推进当前 {@link ScenePlayerScreen}（若存在），并消费快捷键点击
  *       （仅在无界面时打开，避免与已打开界面冲突）。</li>
  * </ul>
@@ -36,7 +42,15 @@ public final class PonderClientEvents {
                         .executes(context -> PonderEntrypoints.openForLookedAtTarget() ? 1 : 0)
                         .then(Commands.argument("target", StringArgumentType.string())
                                 .executes(context -> PonderEntrypoints.openForTarget(
-                                        StringArgumentType.getString(context, "target")) ? 1 : 0))));
+                                        StringArgumentType.getString(context, "target")) ? 1 : 0)))
+                .then(Commands.literal("generate")
+                        .then(Commands.argument("target", StringArgumentType.string())
+                                .executes(context -> PonderEntrypoints.openGenerated(
+                                        StringArgumentType.getString(context, "target")) ? 1 : 0)))
+                .then(Commands.literal("dump")
+                        .then(Commands.argument("target", StringArgumentType.string())
+                                .executes(context -> PonderEntrypoints.dumpGenerated(
+                                        StringArgumentType.getString(context, "target")).isPresent() ? 1 : 0))));
     }
 
     @SubscribeEvent

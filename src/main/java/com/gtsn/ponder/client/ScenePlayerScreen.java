@@ -62,6 +62,7 @@ public final class ScenePlayerScreen extends GtsnScreen {
     private final ButtonWidget replayButton;
 
     private String lastNarrationKey;
+    private int lastNarrationArgsHash;
     private boolean lastPlaying;
     private int lastStepIndex = Integer.MIN_VALUE;
     private boolean seeking;
@@ -138,6 +139,17 @@ public final class ScenePlayerScreen extends GtsnScreen {
         return key == null ? "" : Component.translatable(key).getString();
     }
 
+    /** 本地化并把生成器等注入的模板参数插值进键文案（机器特定旁白）。 */
+    private static String localized(String key, java.util.List<String> args) {
+        if (key == null) {
+            return "";
+        }
+        if (args == null || args.isEmpty()) {
+            return Component.translatable(key).getString();
+        }
+        return Component.translatable(key, args.toArray()).getString();
+    }
+
     /** 姣忓鎴风 tick 鎺ㄨ繘瀵兼紨骞跺埛鏂版帶浠剁粦瀹氾紙鐢?{@code PonderClientEvents} 璋冪敤锛夈€?*/
     public void advance() {
         if (playback.isPlaying()) {
@@ -149,9 +161,12 @@ public final class ScenePlayerScreen extends GtsnScreen {
     /** 鎶婂婕旂姸鎬佸埛鏂板埌鏃佺櫧 / 杩涘害 / 鎸夐挳 / 姝ラ鏍囩锛堜粎鍦ㄥ彉鍖栨椂鏀瑰瓧绗︿覆锛屽噺灏戞棤璋撻噸寤猴級銆?*/
     private void syncWidgets() {
         String narrationKey = playback.narrationKey();
-        if (!Objects.equals(narrationKey, lastNarrationKey)) {
+        java.util.List<String> narrationArgs = playback.narrationArgs();
+        int narrationArgsHash = narrationArgs.hashCode();
+        if (!Objects.equals(narrationKey, lastNarrationKey) || narrationArgsHash != lastNarrationArgsHash) {
             lastNarrationKey = narrationKey;
-            narrationText.text(localized(narrationKey));
+            lastNarrationArgsHash = narrationArgsHash;
+            narrationText.text(localized(narrationKey, narrationArgs));
         }
         progressBar.value(playback.progress());
         boolean playing = playback.isPlaying();

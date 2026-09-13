@@ -20,6 +20,7 @@ public final class SceneStep {
     private final List<String> targets;
     private final Map<String, Object> params;
     private final String narration;
+    private final List<String> narrationArgs;
     private final Map<String, Object> keyframe;
 
     private SceneStep(Builder builder) {
@@ -29,6 +30,7 @@ public final class SceneStep {
         this.targets = List.copyOf(builder.targets);
         this.params = SceneParams.immutableCopy(builder.params);
         this.narration = builder.narration;
+        this.narrationArgs = List.copyOf(builder.narrationArgs);
         this.keyframe = SceneParams.immutableCopy(builder.keyframe);
     }
 
@@ -64,6 +66,15 @@ public final class SceneStep {
         return narration;
     }
 
+    /**
+     * 旁白本地化键的模板参数（不可变、永不 {@code null}）：配合 {@link #narration()} 做
+     * {@code Component.translatable(key, args)} 级别的插值（如机器名 / 结构尺寸 / 仓口数量），
+     * 使同一模板产出机器特定文案。反 DSL：仅字面量字符串，无表达式。
+     */
+    public List<String> narrationArgs() {
+        return narrationArgs;
+    }
+
     /** 关键帧字面量（供视口插值，本工单不消费）；不可变，永不 {@code null}。 */
     public Map<String, Object> keyframe() {
         return keyframe;
@@ -76,6 +87,7 @@ public final class SceneStep {
         private final List<String> targets = new java.util.ArrayList<>();
         private final Map<String, Object> params = new java.util.LinkedHashMap<>();
         private String narration;
+        private final List<String> narrationArgs = new java.util.ArrayList<>();
         private final Map<String, Object> keyframe = new java.util.LinkedHashMap<>();
 
         private Builder() {
@@ -124,6 +136,19 @@ public final class SceneStep {
 
         public Builder narration(String narration) {
             this.narration = narration;
+            return this;
+        }
+
+        public Builder narrationArgs(List<String> narrationArgs) {
+            this.narrationArgs.clear();
+            if (narrationArgs != null) {
+                this.narrationArgs.addAll(narrationArgs);
+            }
+            return this;
+        }
+
+        public Builder addNarrationArg(String argument) {
+            this.narrationArgs.add(Objects.requireNonNull(argument, "narration argument must not be null"));
             return this;
         }
 

@@ -33,7 +33,8 @@ class ScenePlaybackTest {
                 .addStep(SceneStep.builder().id("s0").type(StepType.SHOW_SECTION)
                         .duration(10).addTarget("shell").build())
                 .addStep(SceneStep.builder().id("s1").type(StepType.TEXT)
-                        .duration(20).narration("ponder.test.n1").build())
+                        .duration(20).narration("ponder.test.n1")
+                        .narrationArgs(List.of("Coke Oven", "3x3x3")).build())
                 .addStep(SceneStep.builder().id("s2").type(StepType.TEXT)
                         .duration(30).narration("ponder.test.n2").build())
                 .build();
@@ -156,6 +157,24 @@ class ScenePlaybackTest {
         assertEquals(0.0d, playback.time(), EPS);
         assertEquals(0, playback.stepIndex());
         assertTrue(playback.isPlaying(), "replay resumes playback");
+    }
+
+    @Test
+    void narrationArgsFollowTheMostRecentNarratedStep() {
+        ScenePlayback playback = playback();
+
+        assertTrue(playback.narrationArgs().isEmpty(), "no narration before the first text step");
+
+        playback.seekFraction(0.2d); // inside s1
+        assertEquals("ponder.test.n1", playback.narrationKey());
+        assertEquals(List.of("Coke Oven", "3x3x3"), playback.narrationArgs());
+
+        playback.seekFraction(0.5d); // s2 has no args
+        assertEquals("ponder.test.n2", playback.narrationKey());
+        assertTrue(playback.narrationArgs().isEmpty());
+
+        playback.seekFraction(0.0d);
+        assertTrue(playback.narrationArgs().isEmpty(), "rewinding before narration clears the args");
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.gtsn.ponder.client;
 
 import com.gtsn.ponder.engine.model.SceneData;
+import com.gtsn.ponder.engine.model.SceneDataWriter;
+import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.gt.GtStructureAdapter;
 import com.gtsn.ponder.structure.StructureSource;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -14,6 +16,11 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.lwjgl.glfw.GLFW;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 
 /**
@@ -59,8 +66,23 @@ public final class PonderEntrypoints {
         return openForTarget(blockId);
     }
 
-    /** 确定性入口（客户端命令 / 自动测试）：为目标 id 打开思索屏。 */
+    /**
+     * 确定性入口（客户端命令 / 自动测试）：为目标 id 打开思索屏。若该目标没有手作场景
+     * （{@link SceneLibrary} 未注册），则<b>按需自动生成</b>一个（{@link SceneGenerator}）再打开。
+     */
     public static boolean openForTarget(String target) {
+        return openForTarget(target, false);
+    }
+
+    /**
+     * 强制自动生成的确定性入口：忽略手作场景，始终由结构源生成并打开（开发者 / 自动测试用，
+     * 以便对「自动产物」本身做教学质量评审）。
+     */
+    public static boolean openGenerated(String target) {
+        return openForTarget(target, true);
+    }
+
+    private static boolean openForTarget(String target, boolean forceGenerate) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || minecraft.level == null) {
             message("ponder.gtsnponder.message.no_world");
@@ -71,14 +93,40 @@ public final class PonderEntrypoints {
             message("ponder.gtsnponder.message.no_scene", target);
             return false;
         }
-        SceneData scene = SceneLibrary.get().sceneForTarget(target).orElse(null);
-        if (scene == null) {
-            message("ponder.gtsnponder.message.no_scene", target);
-            return false;
-        }
         StructureSource source = structure.get();
-        minecraft.execute(() -> minecraft.setScreen(new ScenePlayerScreen(scene, source, minecraft.level)));
+        SceneData scene = forceGenerate ? null : SceneLibrary.get().sceneForTarget(target).orElse(null);
+        if (scene == null) {
+            scene = SceneGenerator.generate(source);
+        }
+        final SceneData sceneToOpen = scene;
+        final StructureSource sourceToOpen = source;
+        minecraft.execute(() -> minecraft.setScreen(
+                new ScenePlayerScreen(sceneToOpen, sourceToOpen, minecraft.level)));
         return true;
+    }
+
+    /**
+     * 开发入口：把目标自动生成的场景 JSON 导出到 {@code run/gtsnponder-generated/}（可重生成产物，
+     * 供作者以草稿为起点手作，或对生成器 diff）。返回导出文件路径；失败为空。
+     */
+    public static Optional<Path> dumpGenerated(String target) {
+        Optional<StructureSource> structure = GtStructureAdapter.byId(target);
+        if (structure.isEmpty()) {
+            message("ponder.gtsnponder.message.no_scene", target);
+            return Optional.empty();
+        }
+        String json = SceneDataWriter.toJson(SceneGenerator.generate(structure.get()));
+        File directory = new File(Minecraft.getInstance().gameDirectory, "gtsnponder-generated");
+        try {
+            Files.createDirectories(directory.toPath());
+            Path file = new File(directory, target.replace(':', '_') + ".json").toPath();
+            Files.writeString(file, json, StandardCharsets.UTF_8);
+            message("ponder.gtsnponder.message.dump", file.toString());
+            return Optional.of(file);
+        } catch (IOException failure) {
+            message("ponder.gtsnponder.message.dump_failed", String.valueOf(failure.getMessage()));
+            return Optional.empty();
+        }
     }
 
     private static void message(String key, Object... args) {
