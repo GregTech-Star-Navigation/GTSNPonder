@@ -17,7 +17,7 @@
 
 - **GTSNLib 强依赖**：`com.gtsn.lib:gtsnlib:<ver>`（开发联调用 mavenLocal，组织 GitHub Packages 分发）
 - **组织 fork GTCEu 硬依赖**：`com.gregtechceu.gtceu:gtceu-1.20.1:7.5.4-patch01:slim`（`transitive = false`），来源 `https://maven.pkg.github.com/GregTech-Star-Navigation/GregTech-Modern`（读取需 `read:packages` 凭据）；mods.toml `versionRange="[7.5.4-patch01,8.0.0)"`
-- **LDLib**：仅经 GT 传递（GT 已 `jarJar(modApi)` 内置）；禁止自装 / 自行升级 / 单独声明运行时依赖
+- **LDLib / configuration / Registrate（dev classpath）**：组织 fork GTCEu 以 `:slim` 消费，该工件**不含** `META-INF/jarjar`，故 GT / GTSNLib 的 `embedded=true` 内嵌依赖在开发期缺失——dev classpath **必须**显式声明 `ldlib` / `configuration`（GT 另引用 `registrate`），与 GTSNLib 既有构建一致（T1 实测：不声明则 `runGameTestServer` 以 `ldlib [MISSING], configuration [MISSING]` 失败）。玩家侧由 GT 的完整 jarJar 工件提供；**禁止自行升级版本**
 - **零额外运行时依赖**：不得要求 Create / 独立 Ponder 库 / Flywheel
 - 软依赖（JEI/EMI 等）一律 `mandatory=false` + `versionRange="[0,)"` + `ordering="AFTER"`；缺席时功能降级、**零 `NoClassDefFoundError`**
 

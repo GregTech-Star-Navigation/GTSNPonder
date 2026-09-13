@@ -1,0 +1,173 @@
+plugins {
+    id 'java-library'
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    alias forge.plugins.modDevGradle
+}
+
+group = maven_group
+version = "${mod_version}"
+
+// ModDevGradle declares project-level repositories, which override the settings-level ones.
+// Declare the additional hard-dependency repositories here so they actually participate.
+repositories {
+    // 组织自维护的 GTCEu（GregTech-Modern fork，版本 7.5.4-patch01）发布在组织 GitHub Packages。
+    // 注意：GitHub Packages 的 Maven **读取也需要凭据**（read:packages）。
+    maven {
+        name = "GTSNGTMPackages"
+        url = uri("https://maven.pkg.github.com/GregTech-Star-Navigation/GregTech-Modern")
+        def gtmUser = System.getenv("GITHUB_ACTOR") ?: (project.findProperty("gpr.user")?.toString())
+        def gtmToken = System.getenv("GITHUB_TOKEN") ?: (project.findProperty("gpr.key")?.toString())
+        if (gtmUser && gtmToken) {
+            credentials {
+                username = gtmUser
+                password = gtmToken
+            }
+        } else {
+            logger.warn("[GTSNPonder] 未检测到 GITHUB_ACTOR/GITHUB_TOKEN（或 -Pgpr.user/-Pgpr.key）：解析组织版 GTCEu（7.5.4-patch01）需要 read:packages 凭据，构建将失败。")
+        }
+    }
+
+    mavenCentral()
+    mavenLocal()
+    maven { url = "https://maven.gtceu.com" }
+    maven { url = "https://maven.firstdark.dev/snapshots/" }
+    maven { url = "https://maven.tterrag.com/" }
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+    withSourcesJar()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // 硬依赖（非传递：消费者必须显式声明）。
+    // GTSNLib：开发联调经 mavenLocal；正式分发走组织 GitHub Packages。
+    modImplementation("com.gtsn.lib:gtsnlib:${forge.versions.gtsnlib.get()}") { transitive = false }
+    // 组织 fork GTCEu（slim 变体不含 jarJar 内嵌依赖）。
+    modImplementation("com.gregtechceu.gtceu:gtceu-1.20.1:${forge.versions.gtceu.get()}:slim") { transitive = false }
+    // slim 工件无 META-INF/jarjar，GT / GTSNLib 的 mods.toml 把 ldlib、configuration 声明为
+    // mandatory 且 embedded=true；dev 运行必须显式提供（与 GTSNLib 的 dev classpath 一致）。
+    // Registrate 同样由 GT 引用但其 slim 工件未内嵌。生产由完整 jarJar 工件提供。
+    modImplementation("com.lowdragmc.ldlib:ldlib-forge-1.20.1:${forge.versions.ldlib.get()}") { transitive = false }
+    modImplementation("com.tterrag.registrate:Registrate:${forge.versions.registrate.get()}")
+    modImplementation("dev.toma.configuration:configuration-forge-1.20.1:${forge.versions.configuration.get()}") { transitive = false }
+}
+
+test {
+    useJUnitPlatform()
+}
+
+sourceSets {
+    main.resources {
+        srcDir 'src/generated/resources'
+    }
+}
+
+legacyForge {
+    version = forge.versions.minecraftForge.get()
+
+    parchment {
+        minecraftVersion = forge.versions.minecraft.get()
+        mappingsVersion = forge.versions.parchment.get()
+    }
+
+    addModdingDependenciesTo(sourceSets.test)
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+
+    runs {
+        client {
+            client()
+            ideName = "Client"
+
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            ideName = "Server"
+
+            gameDirectory.set(file('run/server'))
+            programArgument '--nogui'
+            systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        data {
+            data()
+            ideName = "Data Generation"
+
+            gameDirectory.set(file('run/data'))
+            programArguments.addAll('--mod', project.mod_id)
+            programArguments.addAll('--all')
+            programArguments.addAll('--output', file('src/generated/resources/').getAbsolutePath())
+            programArguments.addAll('--existing', file('src/main/resources/').getAbsolutePath())
+            programArguments.addAll('--existing-mod', 'gtceu')
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            ideName = "Game Tests"
+
+            systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.INFO
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.compilerArgs << "-Xlint:-removal"
+}
+
+jar {
+    manifest {
+        attributes([
+            'Specification-Title'   : 'GTSNPonder',
+            'Specification-Vendor'  : 'GTSN',
+            'Specification-Version' : '1',
+            'Implementation-Title'  : 'GTSNPonder',
+            'Implementation-Version': project.version,
+            'Implementation-Vendor' : 'GTSN'
+        ])
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        // GitHub Packages（组织 Maven registry）。
+        // 凭据只从环境变量 / 命令行属性读取，绝不写入仓库：
+        //   GITHUB_ACTOR = GitHub 用户名；GITHUB_TOKEN = 具备 write:packages 的 token
+        //   亦可用 -Pgpr.user / -Pgpr.key 覆盖。
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/GregTech-Star-Navigation/GTSNPonder")
+            def ghUser = System.getenv("GITHUB_ACTOR") ?: (project.findProperty("gpr.user")?.toString())
+            def ghToken = System.getenv("GITHUB_TOKEN") ?: (project.findProperty("gpr.key")?.toString())
+            if (ghUser && ghToken) {
+                credentials {
+                    username = ghUser
+                    password = ghToken
+                }
+            }
+        }
+    }
+}

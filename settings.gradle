@@ -1,0 +1,24 @@
+pluginManagement {
+    repositories {
+        maven { url = "https://maven.minecraftforge.net/" }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        mavenLocal()
+        maven { url = "https://maven.gtceu.com" }
+        maven { url = "https://maven.firstdark.dev/snapshots/" }
+        maven { url = "https://maven.tterrag.com/" }
+    }
+    versionCatalogs {
+        forge {
+            from(files("gradle/forge.versions.toml"))
+        }
+    }
+}
+
+rootProject.name = "${mod_id}"
