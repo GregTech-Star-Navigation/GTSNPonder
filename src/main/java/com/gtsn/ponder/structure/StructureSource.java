@@ -18,8 +18,9 @@ import java.util.Optional;
  * （注意 GT {@code MultiblockShapeInfo} 字段注释写作 {@code [z][y][x]}，但产出与消费两侧
  * 都按 index0 = X 处理；详见 {@code GtStructureAdapter} 的说明）。</p>
  *
- * <p>本 spike 只承载「分层方块 + 控制器位置」；仓口 / 总线角色与模块位区域随自动生成
- * 工单扩展，届时本 DTO 增字段而非改语义。</p>
+ * <p>本 DTO 承载「分层方块（含仓口 / 总线角色）+ 控制器位置 + 模块位区域及其可接受模块」。
+ * 仓口 / 总线角色由 {@link StructureRole} 表达（方块级），模块位由 {@link ModuleSlot} 表达
+ * （区域级，坐标与方块同一结构坐标系）。</p>
  */
 public final class StructureSource {
 
@@ -32,6 +33,7 @@ public final class StructureSource {
     private final int controllerY;
     private final int controllerZ;
     private final List<StructureBlock> blocks;
+    private final List<ModuleSlot> moduleSlots;
 
     private StructureSource(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id");
@@ -50,6 +52,15 @@ public final class StructureSource {
         for (StructureBlock block : this.blocks) {
             if (block.x() >= sizeX || block.y() >= sizeY || block.z() >= sizeZ) {
                 throw new IllegalArgumentException("block " + block + " is outside the declared size "
+                        + sizeX + "x" + sizeY + "x" + sizeZ);
+            }
+        }
+        this.moduleSlots = List.copyOf(builder.moduleSlots);
+        for (ModuleSlot slot : this.moduleSlots) {
+            if (slot.offsetX() + slot.sizeX() > sizeX
+                    || slot.offsetY() + slot.sizeY() > sizeY
+                    || slot.offsetZ() + slot.sizeZ() > sizeZ) {
+                throw new IllegalArgumentException("module slot " + slot + " is outside the declared size "
                         + sizeX + "x" + sizeY + "x" + sizeZ);
             }
         }
@@ -108,6 +119,30 @@ public final class StructureSource {
         return blocks.isEmpty();
     }
 
+    /** 仓口 / 总线单元（{@link StructureRole#isHatch()} 为真者），保持 {@link #blocks()} 的相对顺序。 */
+    public List<StructureBlock> hatches() {
+        List<StructureBlock> hatches = new ArrayList<>();
+        for (StructureBlock block : blocks) {
+            if (block.isHatch()) {
+                hatches.add(block);
+            }
+        }
+        return List.copyOf(hatches);
+    }
+
+    /** 模块位区域（有序，与适配器产出顺序一致）；无模块位时为空列表。 */
+    public List<ModuleSlot> moduleSlots() {
+        return moduleSlots;
+    }
+
+    public boolean hasModuleSlots() {
+        return !moduleSlots.isEmpty();
+    }
+
+    public int moduleSlotCount() {
+        return moduleSlots.size();
+    }
+
     /** 结构包围盒体积（用于「挑最小多方块」等选择策略）。 */
     public int volume() {
         return sizeX * sizeY * sizeZ;
@@ -116,7 +151,9 @@ public final class StructureSource {
     @Override
     public String toString() {
         return "StructureSource[" + id + " " + sizeX + "x" + sizeY + "x" + sizeZ
-                + " blocks=" + blocks.size() + (hasController() ? " controller=" + controllerX + "," + controllerY
+                + " blocks=" + blocks.size() + " hatches=" + hatches().size()
+                + " moduleSlots=" + moduleSlots.size()
+                + (hasController() ? " controller=" + controllerX + "," + controllerY
                 + "," + controllerZ : " no-controller") + "]";
     }
 
@@ -135,6 +172,7 @@ public final class StructureSource {
         private int controllerY = -1;
         private int controllerZ = -1;
         private final List<StructureBlock> blocks = new ArrayList<>();
+        private final List<ModuleSlot> moduleSlots = new ArrayList<>();
 
         private Builder(String id) {
             this.id = Objects.requireNonNull(id, "id");
@@ -167,6 +205,17 @@ public final class StructureSource {
         /** 便捷添加：按局部坐标与方块注册名加入一个单元。 */
         public Builder addBlock(int x, int y, int z, String blockId) {
             return addBlock(new StructureBlock(x, y, z, blockId));
+        }
+
+        /** 便捷添加：按局部坐标、方块注册名与角色加入一个单元。 */
+        public Builder addBlock(int x, int y, int z, String blockId, StructureRole role) {
+            return addBlock(new StructureBlock(x, y, z, blockId, role));
+        }
+
+        /** 加入一个模块位区域（坐标与方块同一结构坐标系）。 */
+        public Builder addModuleSlot(ModuleSlot moduleSlot) {
+            this.moduleSlots.add(Objects.requireNonNull(moduleSlot, "moduleSlot"));
+            return this;
         }
 
         public StructureSource build() {

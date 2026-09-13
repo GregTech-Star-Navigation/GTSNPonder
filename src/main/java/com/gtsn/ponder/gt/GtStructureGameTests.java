@@ -1,21 +1,34 @@
 package com.gtsn.ponder.gt;
 
 import com.gtsn.ponder.GTSNPonder;
+import com.gtsn.ponder.structure.HatchClassifier;
+import com.gtsn.ponder.structure.StructureBlock;
+import com.gtsn.ponder.structure.StructureRole;
 import com.gtsn.ponder.structure.StructureSource;
 
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
+import com.gregtechceu.gtceu.api.machine.module.ModuleDefinition;
+import com.gregtechceu.gtceu.api.machine.module.ModuleRegion;
+import com.gregtechceu.gtceu.api.machine.module.ModuleSlot;
+import com.gregtechceu.gtceu.api.machine.multiblock.PartAbility;
 import com.gregtechceu.gtceu.api.pattern.MultiblockShapeInfo;
 import com.gregtechceu.gtceu.api.registry.GTRegistries;
+import com.gregtechceu.gtceu.common.data.GTMachines;
 
 import com.lowdragmc.lowdraglib.utils.BlockInfo;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * GT 结构适配的 GameTest（真实加载环境：GT 已注册、结构页可展开）。放在
@@ -24,6 +37,9 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  *
  * <p>锁定 {@code BlockInfo[][][]} 的索引约定（见 {@link GtStructureAdapter} 类 javadoc 的陷阱
  * 说明）：index0 = X、index1 = Y、index2 = Z。用非对称尺寸夹具证明「按 index0 迭代」而非转置。</p>
+ *
+ * <p>另验证仓口 / 总线分类（能力特征优先 + 名称兜底）、模块位提取与坐标锚定，以及
+ * 无控制器 / 畸形结构的守卫分支。</p>
  */
 @GameTestHolder(GTSNPonder.MODID)
 @PrefixGameTestTemplate(false)
@@ -107,5 +123,216 @@ public final class GtStructureGameTests {
         helper.assertTrue(source.sizeZ() == grid[0][0].length,
                 "sizeZ " + source.sizeZ() + " != index2 " + grid[0][0].length + " for " + id);
         helper.succeed();
+    }
+
+    /**
+     * 真实多方块（焦炉）产出结构、含控制器单元，且仓口视图与方块角色一致；任何按名称可判为
+     * 仓口的方块都必须被实际标记为仓口（证明名称兜底已应用）。
+     */
+    @GameTest(template = "empty")
+    public static void adapterRealMultiblockRolesAreConsistent(GameTestHelper helper) {
+        StructureSource source = GtStructureAdapter.byId("gtceu:coke_oven").orElse(null);
+        if (source == null) {
+            helper.fail("gtceu:coke_oven did not resolve to a structure source");
+            return;
+        }
+        helper.assertTrue(source.blockCount() > 0, "coke oven has no blocks: " + source);
+        helper.assertTrue(source.hasController(), "coke oven should expose a controller cell: " + source);
+        long hatchBlockCount = source.blocks().stream().filter(block -> block.role().isHatch()).count();
+        helper.assertTrue(source.hatches().size() == hatchBlockCount,
+                "hatches() view disagrees with block roles: " + source);
+        for (StructureBlock block : source.blocks()) {
+            if (HatchClassifier.classifyByName(block.blockId()).isHatch()) {
+                helper.assertTrue(block.isHatch(), "hatch-named block was not classified as a hatch: " + block);
+            }
+        }
+        helper.succeed();
+    }
+
+    /** 能力特征优先：真实 GT 仓口方块被映射为精确的 I/O 角色（而非模糊的 OTHER_HATCH）。 */
+    @GameTest(template = "empty")
+    public static void adapterClassifiesHatchesFromPartAbilities(GameTestHelper helper) {
+        Block itemInput = firstBlock(PartAbility.IMPORT_ITEMS);
+        Block fluidOutput = firstBlock(PartAbility.EXPORT_FLUIDS);
+        Block energyInput = firstBlock(PartAbility.INPUT_ENERGY);
+        Block muffler = firstBlock(PartAbility.MUFFLER);
+        if (itemInput == null || fluidOutput == null || energyInput == null || muffler == null) {
+            helper.fail("PartAbility registry is empty; cannot verify ability-based hatch classification");
+            return;
+        }
+        MultiblockShapeInfo shape = MultiblockShapeInfo.builder()
+                .aisle("ABCDE")
+                .where('A', Blocks.IRON_BLOCK)
+                .where('B', itemInput)
+                .where('C', fluidOutput)
+                .where('D', energyInput)
+                .where('E', muffler)
+                .build();
+
+        StructureSource source = toSynthetic("gtsnponder:test_hatches", shape, List.of());
+        helper.assertTrue(source.blockCount() == 5, "expected 5 blocks, got " + source.blockCount());
+        helper.assertTrue(source.blocks().get(1).role() == StructureRole.ITEM_INPUT,
+                "item bus not classified as ITEM_INPUT: " + source.blocks().get(1));
+        helper.assertTrue(source.blocks().get(2).role() == StructureRole.FLUID_OUTPUT,
+                "fluid hatch not classified as FLUID_OUTPUT: " + source.blocks().get(2));
+        helper.assertTrue(source.blocks().get(3).role() == StructureRole.ENERGY_INPUT,
+                "energy hatch not classified as ENERGY_INPUT: " + source.blocks().get(3));
+        helper.assertTrue(source.blocks().get(4).role() == StructureRole.MUFFLER,
+                "muffler hatch not classified as MUFFLER: " + source.blocks().get(4));
+        helper.assertTrue(source.hatches().size() == 4, "expected 4 hatches, got " + source.hatches().size());
+        helper.succeed();
+    }
+
+    /** 名称兜底：未注册任何 PartAbility 的特殊部件（焦炉仓）仍被识别为仓口。 */
+    @GameTest(template = "empty")
+    public static void adapterUsesNameFallbackForAbilityLessHatch(GameTestHelper helper) {
+        Block cokeOvenHatch = GTMachines.COKE_OVEN_HATCH.getBlock();
+        MultiblockShapeInfo shape = MultiblockShapeInfo.builder()
+                .aisle("AB")
+                .where('A', Blocks.IRON_BLOCK)
+                .where('B', cokeOvenHatch)
+                .build();
+
+        StructureSource source = toSynthetic("gtsnponder:test_name_fallback", shape, List.of());
+        helper.assertTrue(source.blocks().get(1).role() == StructureRole.OTHER_HATCH,
+                "coke oven hatch not classified via name fallback: " + source.blocks().get(1));
+        helper.succeed();
+    }
+
+    /** 模块位提取：区域坐标按 GT 预览映射（控制器 + (-x,+y,-z)）锚定到结构页坐标系。 */
+    @GameTest(template = "empty")
+    public static void adapterExtractsModuleSlotsAnchoredAtController(GameTestHelper helper) {
+        Block controllerBlock = controllerDefinition().getBlock();
+        ModuleDefinition module = new ModuleDefinition(new ResourceLocation("gtsnponder:test_module"));
+        ModuleRegion region = ModuleRegion.at(BlockPos.ZERO, 1, 1, 1);
+        MultiblockShapeInfo shape = MultiblockShapeInfo.builder()
+                .aisle("BBBBBBBA")
+                .where('A', controllerBlock)
+                .where('B', Blocks.IRON_BLOCK)
+                .build();
+
+        StructureSource source = toSynthetic("gtsnponder:test_modules", shape,
+                List.of(ModuleSlot.of(region, module)));
+        helper.assertTrue(source.hasController(), "synthetic multiblock has no controller: " + source);
+        helper.assertTrue(source.moduleSlotCount() == 1, "expected 1 module slot, got " + source.moduleSlotCount());
+        var slot = source.moduleSlots().get(0);
+        helper.assertTrue(slot.offsetX() == 7 && slot.offsetY() == 0 && slot.offsetZ() == 0,
+                "module slot anchored wrong: " + slot);
+        helper.assertTrue(slot.sizeX() == 1 && slot.sizeY() == 1 && slot.sizeZ() == 1,
+                "module slot size wrong: " + slot);
+        helper.assertTrue(!slot.acceptsAnyModule(), "restricted slot should not accept any module: " + slot);
+        helper.assertTrue(slot.acceptableModuleIds().equals(List.of("gtsnponder:test_module")),
+                "acceptable modules wrong: " + slot);
+        helper.assertTrue(slot.accepts("gtsnponder:test_module"), "slot should accept its declared module");
+        helper.succeed();
+    }
+
+    /** 任意模块模块位：acceptsAnyModule 为真且仍被视为有可安装模块。 */
+    @GameTest(template = "empty")
+    public static void adapterKeepsAnyModuleSlot(GameTestHelper helper) {
+        Block controllerBlock = controllerDefinition().getBlock();
+        MultiblockShapeInfo shape = MultiblockShapeInfo.builder()
+                .aisle("BBBBBABB")
+                .where('A', controllerBlock)
+                .where('B', Blocks.IRON_BLOCK)
+                .build();
+
+        StructureSource source = toSynthetic("gtsnponder:test_any_module", shape,
+                List.of(ModuleSlot.any(ModuleRegion.at(BlockPos.ZERO, 2, 1, 1))));
+        helper.assertTrue(source.moduleSlotCount() == 1, "expected 1 module slot, got " + source.moduleSlotCount());
+        var slot = source.moduleSlots().get(0);
+        helper.assertTrue(slot.offsetX() == 5 && slot.offsetY() == 0 && slot.offsetZ() == 0,
+                "any-module slot anchored wrong: " + slot);
+        helper.assertTrue(slot.acceptsAnyModule(), "any-module slot lost its flag: " + slot);
+        helper.assertTrue(slot.hasAcceptableModules(), "any-module slot must have acceptable modules: " + slot);
+        helper.assertTrue(slot.sizeX() == 2, "any-module slot size wrong: " + slot);
+        helper.succeed();
+    }
+
+    /** 守卫：无控制器的结构页不产出模块位（无法锚定区域），但结构本身照常产出。 */
+    @GameTest(template = "empty")
+    public static void adapterDropsModuleSlotsWithoutController(GameTestHelper helper) {
+        MultiblockShapeInfo shape = MultiblockShapeInfo.builder()
+                .aisle("BBBBBBBB")
+                .where('B', Blocks.IRON_BLOCK)
+                .build();
+
+        StructureSource source = toSynthetic("gtsnponder:test_no_controller", shape,
+                List.of(ModuleSlot.any(ModuleRegion.at(BlockPos.ZERO, 1, 1, 1))));
+        helper.assertTrue(source.blockCount() == 8, "structure blocks missing: " + source.blockCount());
+        helper.assertTrue(!source.hasController(), "structure unexpectedly has a controller: " + source);
+        helper.assertTrue(!source.hasModuleSlots(),
+                "module slots must be dropped without a controller: " + source);
+        helper.succeed();
+    }
+
+    /** 守卫：换算后越出结构包围盒的模块位被跳过，结构本身不受影响。 */
+    @GameTest(template = "empty")
+    public static void adapterDropsOutOfBoundsModuleSlot(GameTestHelper helper) {
+        Block controllerBlock = controllerDefinition().getBlock();
+        MultiblockShapeInfo shape = MultiblockShapeInfo.builder()
+                .aisle("ABBBBBBB")
+                .where('A', controllerBlock)
+                .where('B', Blocks.IRON_BLOCK)
+                .build();
+
+        // offset (5,0,0) with controller at x=0 maps to grid x = -5 → outside the structure page.
+        StructureSource source = toSynthetic("gtsnponder:test_oob_module", shape,
+                List.of(ModuleSlot.any(ModuleRegion.at(new BlockPos(5, 0, 0), 1, 1, 1))));
+        helper.assertTrue(source.hasController(), "synthetic multiblock lost its controller: " + source);
+        helper.assertTrue(source.moduleSlotCount() == 0,
+                "out-of-bounds module slot must be dropped: " + source.moduleSlots());
+        helper.succeed();
+    }
+
+    /** 守卫：无结构页 / 空结构页 / 空方块数组 / 未知或畸形 id 一律返回空而不抛异常。 */
+    @GameTest(template = "empty")
+    public static void adapterGuardsMalformedStructures(GameTestHelper helper) {
+        MultiblockMachineDefinition noShapes =
+                new MultiblockMachineDefinition(new ResourceLocation("gtsnponder:test_no_shapes"));
+        helper.assertTrue(GtStructureAdapter.toSource(noShapes).isEmpty(),
+                "definition with unset shapes must yield empty");
+
+        noShapes.setShapes(List::of);
+        helper.assertTrue(GtStructureAdapter.toSource(noShapes).isEmpty(),
+                "definition with empty shapes must yield empty");
+
+        MultiblockShapeInfo nullGrid = new MultiblockShapeInfo((BlockInfo[][][]) null);
+        MultiblockMachineDefinition nullGridDefinition =
+                new MultiblockMachineDefinition(new ResourceLocation("gtsnponder:test_null_grid"));
+        nullGridDefinition.setShapes(() -> Collections.singletonList(nullGrid));
+        helper.assertTrue(GtStructureAdapter.toSource(nullGridDefinition).isEmpty(),
+                "definition with a null grid must yield empty");
+
+        helper.assertTrue(GtStructureAdapter.byId("gtceu:does_not_exist").isEmpty(),
+                "unknown machine id must yield empty");
+        helper.assertTrue(GtStructureAdapter.byId("not a resource location").isEmpty(),
+                "malformed machine id must yield empty");
+        helper.succeed();
+    }
+
+    /** 取焦炉定义用于承载控制器方块（其方块是带 MultiblockMachineDefinition 的 MetaMachineBlock）。 */
+    private static MultiblockMachineDefinition controllerDefinition() {
+        MachineDefinition definition = GTRegistries.MACHINES.get(ResourceLocation.tryParse("gtceu:coke_oven"));
+        if (!(definition instanceof MultiblockMachineDefinition multiblock)) {
+            throw new IllegalStateException("gtceu:coke_oven is not a multiblock definition");
+        }
+        return multiblock;
+    }
+
+    /** 构造一个未注册的合成多方块定义，注入结构页与模块位，再交给适配器。 */
+    private static StructureSource toSynthetic(String id, MultiblockShapeInfo shape, List<ModuleSlot> moduleSlots) {
+        MultiblockMachineDefinition definition = new MultiblockMachineDefinition(new ResourceLocation(id));
+        definition.setShapes(() -> List.of(shape));
+        definition.setModuleSlots(moduleSlots);
+        return GtStructureAdapter.toSource(definition)
+                .orElseThrow(() -> new IllegalStateException("synthetic structure '" + id + "' produced no source"));
+    }
+
+    private static Block firstBlock(PartAbility ability) {
+        for (Block block : ability.getAllBlocks()) {
+            return block;
+        }
+        return null;
     }
 }
