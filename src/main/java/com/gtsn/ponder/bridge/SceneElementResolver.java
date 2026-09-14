@@ -2,6 +2,7 @@ package com.gtsn.ponder.bridge;
 
 import com.gtsn.ponder.engine.model.SceneElement;
 import com.gtsn.ponder.engine.model.SceneParams;
+import com.gtsn.ponder.structure.ModuleSlot;
 import com.gtsn.ponder.structure.StructureBlock;
 import com.gtsn.ponder.structure.StructureRole;
 import com.gtsn.ponder.structure.StructureSource;
@@ -30,6 +31,9 @@ import java.util.Objects;
  *       可选 {@code params.limit}（正整数）把结果截断为确定性前 N 个单元，用于收敛高亮轮廓数量；
  *       可选 {@code params.spread}（布尔）在 {@code limit} 生效时改为在该角色全部单元里<b>均匀抽样</b>
  *       （而非取前 N 个），避免代表位置彼此相邻导致轮廓重叠。两者均为确定性选择。</li>
+ *   <li>{@code moduleslot}：{@code params.index} 指定的 0 基模块位下标，展开为该区域覆盖的全部单元
+ *       （空穴也计入，以 {@link #MODULE_SLOT_CELL_BLOCK_ID} 占位），供模块位区域高亮 / 安装定位；
+ *       缺参数 / 非整数 / 越界时为空。</li>
  * </ul>
  *
  * <p>纯 Java：不依赖 Minecraft 或格雷科技，可 headless 单测（导演核心纪律的延伸）。</p>
@@ -46,6 +50,14 @@ public final class SceneElementResolver {
     public static final String SELECTOR_LAYER = "layer";
     /** 选择器字面量：按方块角色过滤（参数 {@code role}，取 {@link StructureRole} 名，大小写不敏感）。 */
     public static final String SELECTOR_ROLE = "role";
+    /** 选择器字面量：按模块位区域展开为区域单元（参数 {@code index}，0 基模块位下标）。 */
+    public static final String SELECTOR_MODULE_SLOT = ModuleSlot.SELECTOR;
+
+    /**
+     * 模块位区域单元使用的<b>合成方块 id</b>：区域本身可能不含结构方块（空穴模块位），
+     * 故以该占位 id 表达「模块位单元」（仅供高亮 / 轮廓定位，不用于替换真实方块）。
+     */
+    public static final String MODULE_SLOT_CELL_BLOCK_ID = "gtsnponder:module_slot";
 
     private final StructureSource structure;
 
@@ -72,6 +84,7 @@ public final class SceneElementResolver {
                     SceneParams.string(element.params(), "role", null),
                     SceneParams.number(element.params(), "limit", 0.0d),
                     SceneParams.bool(element.params(), "spread", false));
+            case SELECTOR_MODULE_SLOT -> resolveModuleSlot(SceneParams.number(element.params(), "index", Double.NaN));
             default -> List.of();
         };
     }
@@ -160,5 +173,32 @@ public final class SceneElementResolver {
             selected.add(matches.get(index));
         }
         return List.copyOf(selected);
+    }
+
+    /**
+     * 把模块位区域展开为其覆盖的全部结构单元（含区域内的空穴单元，以
+     * {@link #MODULE_SLOT_CELL_BLOCK_ID} 占位）。参数 {@code index} 为 0 基模块位下标；
+     * 缺失 / 非整数 / 越界 → 空集（前向兼容，不抛异常）。单元顺序为确定的
+     * X → Y → Z 嵌套升序。
+     */
+    private List<StructureBlock> resolveModuleSlot(double rawIndex) {
+        if (!Double.isFinite(rawIndex) || rawIndex != Math.rint(rawIndex) || rawIndex < 0.0d) {
+            return List.of();
+        }
+        int index = (int) rawIndex;
+        List<ModuleSlot> slots = structure.moduleSlots();
+        if (index >= slots.size()) {
+            return List.of();
+        }
+        ModuleSlot slot = slots.get(index);
+        List<StructureBlock> cells = new ArrayList<>(slot.volume());
+        for (int x = slot.offsetX(); x < slot.offsetX() + slot.sizeX(); x++) {
+            for (int y = slot.offsetY(); y < slot.offsetY() + slot.sizeY(); y++) {
+                for (int z = slot.offsetZ(); z < slot.offsetZ() + slot.sizeZ(); z++) {
+                    cells.add(new StructureBlock(x, y, z, MODULE_SLOT_CELL_BLOCK_ID));
+                }
+            }
+        }
+        return List.copyOf(cells);
     }
 }

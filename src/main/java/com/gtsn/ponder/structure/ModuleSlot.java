@@ -1,6 +1,7 @@
 package com.gtsn.ponder.structure;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 模块位（Module Slot）：组织 GT fork 独有模块系统的「区域」声明——
@@ -16,6 +17,10 @@ import java.util.List;
  * {@code acceptsAnyModule} 为假表示「不接受任何模块」的退化声明——本 DTO 允许并如实表达
  * （{@link #hasAcceptableModules()} 为假），由上层生成器决定是否跳过安装演示。</p>
  *
+ * <p><b>模块效果</b>：{@code moduleOptions} 为每个可接受模块携带其 {@link ModuleEffectInfo 效果汇总}
+ * （由适配包从 fork 的 {@code ModuleEffectSummary} 读出），供自动生成器的「安装 → 效果汇总」演示。
+ * 手作 / 夹具可省略（退化为空列表），此时安装演示只叙述模块标识、效果汇总标为「无效果」。</p>
+ *
  * <p>纯 Java、零 MC / GT 依赖。不可变：列表在构造时拷贝。</p>
  */
 public record ModuleSlot(
@@ -26,7 +31,11 @@ public record ModuleSlot(
         int sizeY,
         int sizeZ,
         boolean acceptsAnyModule,
-        List<String> acceptableModuleIds) {
+        List<String> acceptableModuleIds,
+        List<ModuleOption> moduleOptions) {
+
+    /** 场景元素选择器字面量：按模块位下标把区域展开为单元（{@code params.index}）。 */
+    public static final String SELECTOR = "moduleslot";
 
     public ModuleSlot {
         if (offsetX < 0 || offsetY < 0 || offsetZ < 0) {
@@ -46,6 +55,36 @@ public record ModuleSlot(
             }
         }
         acceptableModuleIds = List.copyOf(acceptableModuleIds);
+        if (moduleOptions == null) {
+            throw new IllegalArgumentException("moduleOptions must not be null");
+        }
+        moduleOptions = List.copyOf(moduleOptions);
+    }
+
+    /**
+     * 便捷构造：无模块效果元数据的模块位（手作 / 旧夹具）。等价于 {@code moduleOptions = List.of()}。
+     */
+    public ModuleSlot(int offsetX, int offsetY, int offsetZ, int sizeX, int sizeY, int sizeZ,
+            boolean acceptsAnyModule, List<String> acceptableModuleIds) {
+        this(offsetX, offsetY, offsetZ, sizeX, sizeY, sizeZ, acceptsAnyModule, acceptableModuleIds, List.of());
+    }
+
+    /** 某模块的效果汇总（无该模块 / 未声明效果时为空）。 */
+    public Optional<ModuleEffectInfo> effectOf(String moduleId) {
+        return optionFor(moduleId).map(ModuleOption::effect);
+    }
+
+    /** 某模块的选项元数据（无该模块时为空）。 */
+    public Optional<ModuleOption> optionFor(String moduleId) {
+        if (moduleId == null) {
+            return Optional.empty();
+        }
+        for (ModuleOption option : moduleOptions) {
+            if (option.moduleId().equals(moduleId)) {
+                return Optional.of(option);
+            }
+        }
+        return Optional.empty();
     }
 
     /** 区域体积（用于预算 / 排序）。 */

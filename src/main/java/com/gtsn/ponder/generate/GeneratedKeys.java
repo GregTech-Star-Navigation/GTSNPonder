@@ -20,6 +20,7 @@ public final class GeneratedKeys {
     public static final String LEGEND_TITLE = "ponder.gtsnponder.legend.title";
     public static final String LEGEND_CONTROLLER = "ponder.gtsnponder.legend.controller";
     public static final String LEGEND_HATCH = "ponder.gtsnponder.legend.hatch";
+    public static final String LEGEND_MODULE_SLOT = "ponder.gtsnponder.legend.module_slot";
 
     private GeneratedKeys() {
     }

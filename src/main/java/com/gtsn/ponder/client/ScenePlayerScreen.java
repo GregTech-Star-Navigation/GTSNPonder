@@ -51,9 +51,11 @@ public final class ScenePlayerScreen extends GtsnScreen {
     private static final String LEGEND_TITLE_KEY = GeneratedKeys.LEGEND_TITLE;
     private static final String LEGEND_CONTROLLER_KEY = GeneratedKeys.LEGEND_CONTROLLER;
     private static final String LEGEND_HATCH_KEY = GeneratedKeys.LEGEND_HATCH;
+    private static final String LEGEND_MODULE_SLOT_KEY = GeneratedKeys.LEGEND_MODULE_SLOT;
     private static final int LEGEND_SWATCH = 8;
     private static final int LEGEND_PAD = 4;
     private static final int LEGEND_LINE = 10;
+    private static final int LEGEND_ROWS = 4;
     private static final int LEGEND_MARGIN = 6;
 
     private final StructureSource structure;
@@ -289,9 +291,11 @@ public final class ScenePlayerScreen extends GtsnScreen {
         String title = localized(LEGEND_TITLE_KEY);
         String controller = localized(LEGEND_CONTROLLER_KEY);
         String hatch = localized(LEGEND_HATCH_KEY);
-        int textWidth = Math.max(font.width(title), Math.max(font.width(controller), font.width(hatch)));
+        String moduleSlot = localized(LEGEND_MODULE_SLOT_KEY);
+        int textWidth = Math.max(font.width(title),
+                Math.max(font.width(controller), Math.max(font.width(hatch), font.width(moduleSlot))));
         int boxWidth = LEGEND_PAD * 2 + LEGEND_SWATCH + 4 + textWidth;
-        int boxHeight = LEGEND_PAD * 2 + LEGEND_LINE * 3;
+        int boxHeight = LEGEND_PAD * 2 + LEGEND_LINE * LEGEND_ROWS;
         int x = bounds.x() + LEGEND_MARGIN;
         int y = bounds.y() + LEGEND_MARGIN;
         graphics.fill(x, y, x + boxWidth, y + boxHeight, 0xC0101418);
@@ -303,6 +307,8 @@ public final class ScenePlayerScreen extends GtsnScreen {
         drawLegendRow(graphics, font, controller, textX, rowY, DummySceneWorld.HIGHLIGHT_COLOR);
         rowY += LEGEND_LINE;
         drawLegendRow(graphics, font, hatch, textX, rowY, DummySceneWorld.OUTLINE_COLOR);
+        rowY += LEGEND_LINE;
+        drawLegendRow(graphics, font, moduleSlot, textX, rowY, DummySceneWorld.MODULE_SLOT_COLOR);
     }
 
     private static void drawLegendRow(GuiGraphics graphics, Font font,

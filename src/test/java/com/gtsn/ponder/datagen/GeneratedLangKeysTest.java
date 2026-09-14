@@ -38,12 +38,18 @@ class GeneratedLangKeysTest {
             SceneGenerator.NARRATION_HATCHES_NONE,
             SceneGenerator.NARRATION_MODULES,
             SceneGenerator.NARRATION_MODULES_NONE,
+            SceneGenerator.NARRATION_MODULE_SLOT,
+            SceneGenerator.NARRATION_MODULE_SLOT_ANY,
+            SceneGenerator.NARRATION_MODULE_SLOT_NONE,
+            SceneGenerator.NARRATION_MODULE_INSTALLED,
+            SceneGenerator.NARRATION_MODULE_INSTALLED_NO_EFFECT,
             SceneGenerator.NARRATION_FORMED);
 
     private static final List<String> LEGEND_KEYS = List.of(
             GeneratedKeys.LEGEND_TITLE,
             GeneratedKeys.LEGEND_CONTROLLER,
-            GeneratedKeys.LEGEND_HATCH);
+            GeneratedKeys.LEGEND_HATCH,
+            GeneratedKeys.LEGEND_MODULE_SLOT);
 
     /** GT 机器界面覆盖层入口（#12）的按钮文案键，须经 datagen 产出中英双语。 */
     private static final List<String> GT_MACHINE_OVERLAY_KEYS = List.of(

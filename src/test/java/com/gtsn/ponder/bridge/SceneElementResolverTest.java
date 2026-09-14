@@ -1,6 +1,7 @@
 package com.gtsn.ponder.bridge;
 
 import com.gtsn.ponder.engine.model.SceneElement;
+import com.gtsn.ponder.structure.ModuleSlot;
 import com.gtsn.ponder.structure.StructureBlock;
 import com.gtsn.ponder.structure.StructureRole;
 import com.gtsn.ponder.structure.StructureSource;
@@ -168,6 +169,70 @@ class SceneElementResolverTest {
                 "spread must sample evenly across the whole role, including the last unit");
         assertEquals(List.of(1, 2, 3), firstN.stream().map(StructureBlock::x).toList(),
                 "without spread the first N units are used");
+    }
+
+    /** 含一个 2×1×2 模块位的夹具（区域外仍有普通方块，模块位区域以空穴表达）。 */
+    private static StructureSource withModuleSlots() {
+        return StructureSource.builder("gtceu:slotted")
+                .displayName("Slotted Machine")
+                .size(4, 2, 4)
+                .controller(3, 0, 3)
+                .addBlock(3, 0, 3, "gtceu:test_controller", StructureRole.CONTROLLER)
+                .addBlock(0, 1, 0, "gtceu:test_casing")
+                .addModuleSlot(new ModuleSlot(0, 0, 0, 2, 1, 2, true, List.of()))
+                .addModuleSlot(new ModuleSlot(2, 0, 0, 1, 1, 1, false, List.of("gtceu:test_module")))
+                .build();
+    }
+
+    @Test
+    void moduleSlotSelectorReturnsRegionCells() {
+        SceneElementResolver resolver = new SceneElementResolver(withModuleSlots());
+
+        List<StructureBlock> cells = resolver.resolve(
+                SceneElement.of("moduleslot.0", "region", Map.of("selector", "moduleslot", "index", 0.0d)));
+
+        assertEquals(4, cells.size(), "2x1x2 slot region must resolve to 4 cells");
+        assertEquals(List.of(
+                new StructureBlock(0, 0, 0, SceneElementResolver.MODULE_SLOT_CELL_BLOCK_ID),
+                new StructureBlock(0, 0, 1, SceneElementResolver.MODULE_SLOT_CELL_BLOCK_ID),
+                new StructureBlock(1, 0, 0, SceneElementResolver.MODULE_SLOT_CELL_BLOCK_ID),
+                new StructureBlock(1, 0, 1, SceneElementResolver.MODULE_SLOT_CELL_BLOCK_ID)), cells);
+    }
+
+    @Test
+    void moduleSlotSelectorResolvesSecondSlotRegion() {
+        SceneElementResolver resolver = new SceneElementResolver(withModuleSlots());
+
+        List<StructureBlock> cells = resolver.resolve(
+                SceneElement.of("moduleslot.1", "region", Map.of("selector", "moduleslot", "index", 1.0d)));
+
+        assertEquals(List.of(new StructureBlock(2, 0, 0, SceneElementResolver.MODULE_SLOT_CELL_BLOCK_ID)), cells);
+    }
+
+    @Test
+    void moduleSlotSelectorWithoutIndexIsEmpty() {
+        SceneElementResolver resolver = new SceneElementResolver(withModuleSlots());
+
+        assertTrue(resolver.resolve(
+                SceneElement.of("moduleslot.0", "region", Map.of("selector", "moduleslot"))).isEmpty());
+    }
+
+    @Test
+    void moduleSlotSelectorOutOfRangeIsEmpty() {
+        SceneElementResolver resolver = new SceneElementResolver(withModuleSlots());
+
+        assertTrue(resolver.resolve(SceneElement.of("moduleslot.9", "region",
+                Map.of("selector", "moduleslot", "index", 9.0d))).isEmpty());
+        assertTrue(resolver.resolve(SceneElement.of("moduleslot.-1", "region",
+                Map.of("selector", "moduleslot", "index", -1.0d))).isEmpty());
+    }
+
+    @Test
+    void moduleSlotSelectorWithoutSlotsIsEmpty() {
+        SceneElementResolver resolver = new SceneElementResolver(fixture());
+
+        assertTrue(resolver.resolve(SceneElement.of("moduleslot.0", "region",
+                Map.of("selector", "moduleslot", "index", 0.0d))).isEmpty());
     }
 
     @Test

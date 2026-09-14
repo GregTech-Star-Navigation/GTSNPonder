@@ -14,9 +14,13 @@ import com.gtsn.ponder.structure.StructureSource;
 
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
+import com.gregtechceu.gtceu.api.machine.module.EnergyModuleEffect;
 import com.gregtechceu.gtceu.api.machine.module.ModuleDefinition;
 import com.gregtechceu.gtceu.api.machine.module.ModuleRegion;
 import com.gregtechceu.gtceu.api.machine.module.ModuleSlot;
+import com.gregtechceu.gtceu.api.machine.module.ParallelModuleEffect;
+import com.gregtechceu.gtceu.api.machine.module.SpeedModuleEffect;
+import com.gregtechceu.gtceu.api.machine.module.TierModuleEffect;
 import com.gregtechceu.gtceu.api.machine.multiblock.PartAbility;
 import com.gregtechceu.gtceu.api.pattern.MultiblockShapeInfo;
 import com.gregtechceu.gtceu.api.registry.GTRegistries;
@@ -353,6 +357,66 @@ public final class GtStructureGameTests {
             checked++;
         }
         helper.assertTrue(checked > 0, "no real multiblock could be auto-generated (GT loaded?)");
+        helper.succeed();
+    }
+
+    /**
+     * 模块效果提取：适配器把 fork 的 {@code ModuleEffectSummary}（来自模块声明的
+     * {@code ModuleEffect} 家族）翻译为中性的模块效果汇总（并行 / 速度 / 能耗 / 等级）。
+     */
+    @GameTest(template = "empty")
+    public static void adapterExtractsModuleEffectSummary(GameTestHelper helper) {
+        Block controllerBlock = controllerDefinition().getBlock();
+        ModuleDefinition module = new ModuleDefinition(new ResourceLocation("gtsnponder:test_effect_module"))
+                .effect(new ParallelModuleEffect(4))
+                .effect(new SpeedModuleEffect(0.5d))
+                .effect(new EnergyModuleEffect(0.8d))
+                .effect(new TierModuleEffect(1));
+        ModuleRegion region = ModuleRegion.at(BlockPos.ZERO, 1, 1, 1);
+        MultiblockShapeInfo shape = MultiblockShapeInfo.builder()
+                .aisle("BBBBBBBA")
+                .where('A', controllerBlock)
+                .where('B', Blocks.IRON_BLOCK)
+                .build();
+
+        StructureSource source = toSynthetic("gtsnponder:test_module_effects", shape,
+                List.of(ModuleSlot.of(region, module)));
+        helper.assertTrue(source.moduleSlotCount() == 1, "expected 1 module slot: " + source);
+        var slot = source.moduleSlots().get(0);
+        helper.assertTrue(slot.moduleOptions().size() == 1,
+                "expected exactly one module option: " + slot.moduleOptions());
+        var option = slot.moduleOptions().get(0);
+        helper.assertTrue(option.moduleId().equals("gtsnponder:test_effect_module"),
+                "module id not carried into the option: " + option);
+        var effect = option.effect();
+        helper.assertTrue(effect.parallelCapacity() == 4,
+                "parallel capacity not extracted from the fork: " + effect);
+        helper.assertTrue(Math.abs(effect.speedMultiplier() - 0.5d) < 1.0e-6d,
+                "speed multiplier not extracted: " + effect);
+        helper.assertTrue(Math.abs(effect.energyMultiplier() - 0.8d) < 1.0e-6d,
+                "energy multiplier not extracted: " + effect);
+        helper.assertTrue(effect.tierBonus() == 1, "tier bonus not extracted: " + effect);
+        helper.succeed();
+    }
+
+    /**
+     * 真实数据路径证据（latching）：现行组织 fork 中<b>没有生产机器声明模块位</b>
+     * （{@link GtStructureAdapter#countMachinesDeclaringModuleSlots()} == 0），故模块系统演示以
+     * 「夹具结构源 + 注入缝」（合成 {@link MultiblockMachineDefinition} 注入模块位）验证。
+     *
+     * <p>本测试在计数变为非零时<b>故意失败</b>：这不表示回归，而是提醒——真实数据路径已可用，
+     * 应把演示 / 自动测试切到真实声明模块位的机器，并更新 AGENTS.md / ADR-0006 的偏差记录。</p>
+     */
+    @GameTest(template = "empty")
+    public static void adapterReportsNoProductionModuleSlotsYet(GameTestHelper helper) {
+        int declaring = GtStructureAdapter.countMachinesDeclaringModuleSlots();
+        helper.assertTrue(declaring >= 0, "module-slot machine count must be non-negative");
+        if (declaring > 0) {
+            helper.fail("production machines now declare module slots (" + declaring + "); switch the "
+                    + "module demo / autotest from the fixture injection seam to the real data path "
+                    + "and update AGENTS.md / ADR-0006");
+            return;
+        }
         helper.succeed();
     }
 

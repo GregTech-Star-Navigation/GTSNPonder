@@ -77,6 +77,14 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(SceneGenerator.NARRATION_MODULES,
                 "%s module slot(s) - install matching modules here.");
         keys.put(SceneGenerator.NARRATION_MODULES_NONE, "This structure declares no module slots.");
+        keys.put(SceneGenerator.NARRATION_MODULE_SLOT, "Slot %s: accepts %s.");
+        keys.put(SceneGenerator.NARRATION_MODULE_SLOT_ANY, "Slot %s: accepts any module.");
+        keys.put(SceneGenerator.NARRATION_MODULE_SLOT_NONE, "Slot %s: accepts no module.");
+        keys.put(SceneGenerator.NARRATION_MODULE_INSTALLED,
+                "Installed %s into slot %s - parallel %s, speed x%s, energy x%s, input x%s, "
+                        + "output x%s, tier +%s.");
+        keys.put(SceneGenerator.NARRATION_MODULE_INSTALLED_NO_EFFECT,
+                "Installed %s into slot %s - no recipe effects.");
         keys.put(SceneGenerator.NARRATION_FORMED,
                 "%s (%s) formed demo: %s hatch/bus block(s) (%s), %s module slot(s). "
                         + "Hidden then shown again: unformed -> formed.");
@@ -84,6 +92,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(GeneratedKeys.LEGEND_TITLE, "Legend");
         keys.put(GeneratedKeys.LEGEND_CONTROLLER, "Controller (gold)");
         keys.put(GeneratedKeys.LEGEND_HATCH, "Hatch / bus (blue)");
+        keys.put(GeneratedKeys.LEGEND_MODULE_SLOT, "Module slot (green)");
 
         keys.put("ponder.gtsnponder.message.no_target", "No GT machine or multiblock in view (within reach).");
         keys.put("ponder.gtsnponder.message.no_scene", "No ponder scene is registered for %s.");
@@ -121,12 +130,19 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(SceneGenerator.NARRATION_HATCHES_NONE, "该结构未声明仓口或总线。");
         keys.put(SceneGenerator.NARRATION_MODULES, "%s 个模块位——在此安装匹配的模块。");
         keys.put(SceneGenerator.NARRATION_MODULES_NONE, "该结构未声明模块位。");
+        keys.put(SceneGenerator.NARRATION_MODULE_SLOT, "槽 %s：接受 %s。");
+        keys.put(SceneGenerator.NARRATION_MODULE_SLOT_ANY, "槽 %s：接受任意模块。");
+        keys.put(SceneGenerator.NARRATION_MODULE_SLOT_NONE, "槽 %s：不接受任何模块。");
+        keys.put(SceneGenerator.NARRATION_MODULE_INSTALLED,
+                "安装 %s 到槽 %s——并行 %s、速度 ×%s、能耗 ×%s、输入 ×%s、输出 ×%s、等级 +%s。");
+        keys.put(SceneGenerator.NARRATION_MODULE_INSTALLED_NO_EFFECT, "安装 %s 到槽 %s——无配方效果。");
         keys.put(SceneGenerator.NARRATION_FORMED,
                 "%s（%s）成型演示：本机 %s 个仓口 / 总线（%s）、%s 个模块位。先隐藏再重现，即未成型 → 成型。");
 
         keys.put(GeneratedKeys.LEGEND_TITLE, "图例");
         keys.put(GeneratedKeys.LEGEND_CONTROLLER, "控制器（金色）");
         keys.put(GeneratedKeys.LEGEND_HATCH, "仓口 / 总线（蓝色）");
+        keys.put(GeneratedKeys.LEGEND_MODULE_SLOT, "模块位（绿色）");
 
         keys.put("ponder.gtsnponder.message.no_target", "视线内没有格雷科技机器 / 多方块（需在触及范围内）。");
         keys.put("ponder.gtsnponder.message.no_scene", "%s 暂无思索场景。");

@@ -1,6 +1,8 @@
 package com.gtsn.ponder.gt;
 
 import com.gtsn.ponder.structure.HatchClassifier;
+import com.gtsn.ponder.structure.ModuleEffectInfo;
+import com.gtsn.ponder.structure.ModuleOption;
 import com.gtsn.ponder.structure.ModuleSlot;
 import com.gtsn.ponder.structure.StructureRole;
 import com.gtsn.ponder.structure.StructureSource;
@@ -9,6 +11,8 @@ import com.gregtechceu.gtceu.api.block.MetaMachineBlock;
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
 import com.gregtechceu.gtceu.api.machine.module.ModuleDefinition;
+import com.gregtechceu.gtceu.api.machine.module.ModuleEffect;
+import com.gregtechceu.gtceu.api.machine.module.ModuleEffectSummary;
 import com.gregtechceu.gtceu.api.machine.module.ModuleRegion;
 import com.gregtechceu.gtceu.api.machine.module.ModuleSlotInfo;
 import com.gregtechceu.gtceu.api.machine.multiblock.PartAbility;
@@ -26,6 +30,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +80,9 @@ import java.util.Optional;
  *
  * <h2>模块位（组织 fork 独有）</h2>
  * <p>{@link MultiblockMachineDefinition#getModuleSlotInfos()} 给出模块位区域与其可接受模块。
- * 区域坐标相对**控制器**；结构页坐标相对包围盒原点。本适配器按 GT 自己预览用的映射
+ * 每个可接受模块的<b>效果汇总</b>经 fork 的 {@code ModuleEffectSummary.of(module.getEffects())}
+ * 读出并翻译为中性的 {@link ModuleEffectInfo}（并行 / 速度 / 能耗 / 输入 / 输出 / 等级），
+ * 供自动生成器的「安装 → 效果汇总」演示使用。区域坐标相对**控制器**；结构页坐标相对包围盒原点。本适配器按 GT 自己预览用的映射
  * （{@code ModulePreviewPlacement.gridOffset = (-x, +y, -z)}，即
  * {@code grid = controller + (-offsetX, +offsetY, -offsetZ)}）把区域换算到结构页坐标系，
  * 与方块同系。守卫：结构页无控制器时无法锚定模块区域，直接略过（不产出模块位）；区域退化
@@ -166,6 +173,30 @@ public final class GtStructureAdapter {
             return Optional.empty();
         }
         return toSource(multiblock);
+    }
+
+    /**
+     * 已注册多方块中<b>声明了模块位</b>的数量（诊断 / 证据）：用于证实现行 fork 的真实数据路径
+     * 是否可用。返回 0 表示无任何生产机器声明模块位，模块演示须走「夹具结构源 + 注入缝」。
+     */
+    public static int countMachinesDeclaringModuleSlots() {
+        int count = 0;
+        for (MachineDefinition definition : GTRegistries.MACHINES) {
+            if (definition instanceof MultiblockMachineDefinition multiblock && declaresModuleSlots(multiblock)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean declaresModuleSlots(MultiblockMachineDefinition multiblock) {
+        try {
+            List<ModuleSlotInfo> infos = multiblock.getModuleSlotInfos();
+            return infos != null && !infos.isEmpty();
+        } catch (RuntimeException failure) {
+            // 畸形定义按「无模块位」处理（与 toSource 相同的降级纪律，不抛出）。
+            return false;
+        }
     }
 
     /** 把某个多方块定义翻译为结构源（其第一个结构页）。 */
@@ -368,15 +399,49 @@ public final class GtStructureAdapter {
                 continue;
             }
             List<String> moduleIds = new ArrayList<>();
+            List<ModuleOption> options = new ArrayList<>();
             if (info.acceptable() != null) {
                 for (ModuleDefinition module : info.acceptable()) {
-                    if (module != null && module.getId() != null) {
-                        moduleIds.add(module.getId().toString());
+                    if (module == null || module.getId() == null) {
+                        continue;
                     }
+                    String moduleId = module.getId().toString();
+                    moduleIds.add(moduleId);
+                    options.add(new ModuleOption(moduleId, effectOf(module)));
                 }
             }
             builder.addModuleSlot(new ModuleSlot(gridX, gridY, gridZ, slotX, slotY, slotZ,
-                    info.slot().acceptsAnyModule(), moduleIds.stream().distinct().sorted().toList()));
+                    info.slot().acceptsAnyModule(), moduleIds.stream().distinct().sorted().toList(),
+                    options.stream().distinct().sorted(Comparator.comparing(ModuleOption::moduleId)).toList()));
+        }
+    }
+
+    /**
+     * 读取一个模块的效果汇总（fork 的 {@code ModuleEffectSummary}）并翻译为中性
+     * {@link ModuleEffectInfo}。任何异常 / 缺失一律退化为 {@link ModuleEffectInfo#EMPTY}
+     * （绝不抛出，保持适配层「失败即降级」的纪律）。
+     */
+    private static ModuleEffectInfo effectOf(ModuleDefinition module) {
+        List<ModuleEffect> effects;
+        try {
+            effects = module.getEffects();
+        } catch (RuntimeException failure) {
+            return ModuleEffectInfo.EMPTY;
+        }
+        if (effects == null || effects.isEmpty()) {
+            return ModuleEffectInfo.EMPTY;
+        }
+        try {
+            ModuleEffectSummary summary = ModuleEffectSummary.of(effects);
+            return new ModuleEffectInfo(
+                    summary.parallelCapacity(),
+                    summary.speedMultiplier(),
+                    summary.energyMultiplier(),
+                    summary.inputMultiplier(),
+                    summary.outputMultiplier(),
+                    summary.tierBonus());
+        } catch (RuntimeException failure) {
+            return ModuleEffectInfo.EMPTY;
         }
     }
 

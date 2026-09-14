@@ -9,6 +9,9 @@ import com.gtsn.ponder.engine.model.StepType;
 import com.gtsn.ponder.structure.StructureBlock;
 import com.gtsn.ponder.structure.StructureRole;
 import com.gtsn.ponder.structure.StructureSource;
+import com.gtsn.ponder.structure.ModuleEffectInfo;
+import com.gtsn.ponder.structure.ModuleOption;
+import com.gtsn.ponder.structure.ModuleSlot;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -79,6 +82,14 @@ public final class SceneGenerator {
     public static final String HATCH_PREFIX = "hatch.";
     /** 控制器锚点元素 ID。 */
     public static final String ELEMENT_CONTROLLER = "controller";
+    /** 模块位区域元素 ID 前缀（后缀为 0 基模块位下标）。 */
+    public static final String ELEMENT_MODULE_SLOT_PREFIX = "moduleslot.";
+
+    /**
+     * 「任意模块」模块位无具名可接受模块时，安装演示所用的<b>代表模块 id</b>（有据可查的占位：
+     * 仅用于场景叙述与安装效果，不代表一个真实注册的模块定义）。
+     */
+    public static final String GENERIC_MODULE_ID = "gtsnponder:generic_module";
 
     /** 旁白键（自动文案经 datagen 批量产出，见规格 §本地化）。参数见各步骤 narrationArgs。 */
     public static final String NARRATION_INTRO = "ponder.gtsnponder.generated.narration.intro";
@@ -89,6 +100,23 @@ public final class SceneGenerator {
     public static final String NARRATION_HATCHES_NONE = "ponder.gtsnponder.generated.narration.hatches.none";
     public static final String NARRATION_MODULES = "ponder.gtsnponder.generated.narration.modules";
     public static final String NARRATION_MODULES_NONE = "ponder.gtsnponder.generated.narration.modules.none";
+    /** 单个模块位叙述（参数：槽号 / 可接受模块列表）。 */
+    public static final String NARRATION_MODULE_SLOT = "ponder.gtsnponder.generated.narration.module.slot";
+    /** 「接受任意模块」的模块位叙述（参数：槽号）。 */
+    public static final String NARRATION_MODULE_SLOT_ANY =
+            "ponder.gtsnponder.generated.narration.module.slot.any";
+    /** 「不接受任何模块」的模块位叙述（参数：槽号）。 */
+    public static final String NARRATION_MODULE_SLOT_NONE =
+            "ponder.gtsnponder.generated.narration.module.slot.none";
+    /**
+     * 安装效果汇总叙述（参数：模块 id / 槽号 / 并行 / 速度 / 能耗 / 输入 / 输出 / 等级加成）。
+     * 数值来自 fork 的模块效果汇总（{@link ModuleEffectInfo}）。
+     */
+    public static final String NARRATION_MODULE_INSTALLED =
+            "ponder.gtsnponder.generated.narration.module.installed";
+    /** 无配方效果的安装叙述（参数：模块 id / 槽号）。 */
+    public static final String NARRATION_MODULE_INSTALLED_NO_EFFECT =
+            "ponder.gtsnponder.generated.narration.module.installed.none";
     public static final String NARRATION_FORMED = "ponder.gtsnponder.generated.narration.formed";
 
     private static final int INTRO_TEXT_DURATION = 45;
@@ -117,6 +145,9 @@ public final class SceneGenerator {
 
     /** 仓口 / 总线高亮轮廓总数上限（收敛，避免大量重叠轮廓）。 */
     public static final int HATCH_OUTLINE_LIMIT = 4;
+
+    /** 模块安装演示步骤时长（tick）：安装动作占用的时间轴。 */
+    private static final int INSTALL_DURATION = 25;
 
     private SceneGenerator() {
     }
@@ -152,7 +183,7 @@ public final class SceneGenerator {
 
         appendControllerHighlight(source, steps);
         appendHatchHighlight(source, elements, steps);
-        appendModuleNarration(source, steps);
+        appendModuleDemonstration(source, elements, steps);
         appendFormedDemonstration(source, steps, buildSectionIds);
 
         return SceneData.builder()
@@ -272,13 +303,112 @@ public final class SceneGenerator {
                 List.of(String.valueOf(source.hatches().size()), rolesText(hatchRoles))));
     }
 
-    private static void appendModuleNarration(StructureSource source, List<SceneStep> steps) {
-        if (source.hasModuleSlots()) {
-            steps.add(text("text.modules", NARRATION_MODULES, TEXT_DURATION,
-                    List.of(String.valueOf(source.moduleSlotCount()))));
-        } else {
+    /**
+     * 模块系统演示：对每个模块位——
+     * <ol>
+     *   <li>把模块位<b>区域</b>声明为元素（选择器 {@link ModuleSlot#SELECTOR}），并以 {@code outline}
+     *       高亮整个区域（非单块）；</li>
+     *   <li>叙述该模块位的<b>可接受模块</b>（具名列表 / 任意模块 / 不接受任何模块）；</li>
+     *   <li>对可安装的模块位发出 {@code installModule}（空模块位 → 安装一个模块），随后叙述
+     *       <b>效果汇总</b>（来自 fork 的模块效果，见 {@link ModuleEffectInfo}）。</li>
+     * </ol>
+     * 顺序确定：模块位按声明下标、可接受模块按 id 升序、安装取第一个（字典序最小）可接受模块；
+     * 「任意模块」模块位安装一个有据可查的代表模块（{@link #GENERIC_MODULE_ID}）。
+     */
+    private static void appendModuleDemonstration(StructureSource source, List<SceneElement> elements,
+            List<SceneStep> steps) {
+        if (!source.hasModuleSlots()) {
             steps.add(text("text.modules", NARRATION_MODULES_NONE, TEXT_DURATION, List.of()));
+            return;
         }
+        steps.add(text("text.modules", NARRATION_MODULES, TEXT_DURATION,
+                List.of(String.valueOf(source.moduleSlotCount()))));
+
+        List<ModuleSlot> slots = source.moduleSlots();
+        for (int index = 0; index < slots.size(); index++) {
+            ModuleSlot slot = slots.get(index);
+            String elementId = ELEMENT_MODULE_SLOT_PREFIX + index;
+            elements.add(SceneElement.of(elementId, "region", Map.of(
+                    "selector", ModuleSlot.SELECTOR, "index", (double) index)));
+            steps.add(SceneStep.builder()
+                    .id("outline.moduleslot." + index)
+                    .type(StepType.OUTLINE)
+                    .duration(OUTLINE_DURATION)
+                    .targets(List.of(elementId))
+                    .param("visible", Boolean.TRUE)
+                    .build());
+
+            String slotNumber = String.valueOf(index + 1);
+            if (!slot.hasAcceptableModules()) {
+                steps.add(text("text.moduleslot." + index, NARRATION_MODULE_SLOT_NONE, TEXT_DURATION,
+                        List.of(slotNumber)));
+                continue;
+            }
+            if (slot.moduleOptions().isEmpty()) {
+                steps.add(text("text.moduleslot." + index, NARRATION_MODULE_SLOT_ANY, TEXT_DURATION,
+                        List.of(slotNumber)));
+            } else {
+                steps.add(text("text.moduleslot." + index, NARRATION_MODULE_SLOT, TEXT_DURATION,
+                        List.of(slotNumber, acceptedModulesText(slot))));
+            }
+
+            String moduleId = installModuleFor(slot);
+            steps.add(SceneStep.builder()
+                    .id("install.moduleslot." + index)
+                    .type(StepType.INSTALL_MODULE)
+                    .duration(INSTALL_DURATION)
+                    .targets(List.of(elementId))
+                    .param("module", moduleId)
+                    .build());
+            steps.add(installedModuleText(index, slot, moduleId, slotNumber));
+        }
+    }
+
+    /** 可接受模块的确定性文本：取模块效果选项的 id（否则取下声明 id），按字典序升序、逗号分隔。 */
+    private static String acceptedModulesText(ModuleSlot slot) {
+        List<String> ids = new ArrayList<>();
+        if (slot.moduleOptions().isEmpty()) {
+            ids.addAll(slot.acceptableModuleIds());
+        } else {
+            for (ModuleOption option : slot.moduleOptions()) {
+                ids.add(option.moduleId());
+            }
+        }
+        ids.sort(Comparator.naturalOrder());
+        return String.join(", ", ids);
+    }
+
+    /** 安装演示所用的模块：可接受模块中字典序最小者；无具名模块时用 {@link #GENERIC_MODULE_ID}。 */
+    private static String installModuleFor(ModuleSlot slot) {
+        String smallest = null;
+        for (ModuleOption option : slot.moduleOptions()) {
+            if (smallest == null || option.moduleId().compareTo(smallest) < 0) {
+                smallest = option.moduleId();
+            }
+        }
+        if (smallest != null) {
+            return smallest;
+        }
+        return GENERIC_MODULE_ID;
+    }
+
+    /** 安装后的效果汇总叙述（数值来自 {@link ModuleEffectInfo}；中性效果走「无效果」键）。 */
+    private static SceneStep installedModuleText(int index, ModuleSlot slot, String moduleId, String slotNumber) {
+        ModuleEffectInfo effect = slot.optionFor(moduleId).map(ModuleOption::effect)
+                .orElse(ModuleEffectInfo.EMPTY);
+        if (effect.isEmpty()) {
+            return text("text.installed." + index, NARRATION_MODULE_INSTALLED_NO_EFFECT, TEXT_DURATION,
+                    List.of(moduleId, slotNumber));
+        }
+        return text("text.installed." + index, NARRATION_MODULE_INSTALLED, TEXT_DURATION, List.of(
+                moduleId,
+                slotNumber,
+                String.valueOf(effect.parallelCapacity()),
+                String.valueOf(effect.speedMultiplier()),
+                String.valueOf(effect.energyMultiplier()),
+                String.valueOf(effect.inputMultiplier()),
+                String.valueOf(effect.outputMultiplier()),
+                String.valueOf(effect.tierBonus())));
     }
 
     private static void appendFormedDemonstration(StructureSource source, List<SceneStep> steps,

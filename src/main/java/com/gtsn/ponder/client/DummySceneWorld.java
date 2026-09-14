@@ -6,6 +6,8 @@ import com.gtsn.ponder.engine.director.SceneWorld;
 import com.gtsn.ponder.engine.director.SceneWorldState;
 import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.SceneElement;
+import com.gtsn.ponder.engine.model.SceneParams;
+import com.gtsn.ponder.structure.ModuleSlot;
 import com.gtsn.ponder.structure.StructureBlock;
 import com.gtsn.ponder.structure.StructureSource;
 import com.gtsn.ponder.viewport.ViewportController;
@@ -51,11 +53,13 @@ import java.util.Set;
  *   <li>{@code setCamera}：映射到视口相机（yaw / pitch / distance）。</li>
  * </ul>
  *
- * <h2>尚未可真实呈现的效果</h2>
- * <p>{@code installModule} / {@code pulseFormed} / {@code emitParticles} 目前<b>只记录状态</b>
- * （模块映射 / 成型脉冲列表 / 粒子目标列表），不改变虚世界几何——模块合并、成型状态与粒子系统
- * 属后续工单。记录它们是为保证 {@link #snapshot()} / {@link #restore(SceneWorldState)} 的
- * <b>完整还原</b>：任何 seek / rewind 之后这些状态也与「顺序播放到该时刻」一致。</p>
+ * <h2>模块安装（有意义的世界效果）</h2>
+ * <p>{@code installModule} 会把模块位区域的单元替换为「已安装模块」的外观方块（候选见
+ * {@link #MODULE_BLOCK_CANDIDATES}；最终方块 id 属世界桥关注点，不进入冻结的场景数据），
+ * 并把该槽位区域并入可见集——空模块位安装后模块才出现。{@code pulseFormed} / {@code emitParticles}
+ * 仍<b>只记录状态</b>（成型状态与粒子系统属后续工单），记录它们是为保证
+ * {@link #snapshot()} / {@link #restore(SceneWorldState)} 的<b>完整还原</b>：任何 seek / rewind
+ * 之后这些状态也与「顺序播放到该时刻」一致。</p>
  *
  * <h2>快照</h2>
  * <p>快照深拷贝虚世界方块状态 + 全部分段 / 高亮 / 轮廓 / 模块 / 脉冲 / 粒子 / 旁白 / 相机状态；
@@ -70,6 +74,18 @@ public final class DummySceneWorld implements SceneWorld {
     public static final int HIGHLIGHT_COLOR = 0xFFFFC000;
     /** 仓口 / 总线轮廓色（蓝）——与播放屏常驻图例共用。 */
     public static final int OUTLINE_COLOR = 0xFF40C0FF;
+    /** 模块位区域轮廓色（绿）——与播放屏常驻图例共用。 */
+    public static final int MODULE_SLOT_COLOR = 0xFF5CE65C;
+
+    /**
+     * 已安装模块在虚世界里的<b>外观方块</b>候选（按顺序取第一个已注册者）：首选 GT 的计算机机壳，
+     * 依次回退到钢 / 青铜机壳与原版青金石块，保证任何环境下「模块出现」都有可见几何。
+     */
+    private static final List<String> MODULE_BLOCK_CANDIDATES = List.of(
+            "gtceu:computer_casing",
+            "gtceu:steel_casing",
+            "gtceu:bronze_casing",
+            "minecraft:lapis_block");
 
     private final StructureSource structure;
     private final SceneData scene;
@@ -78,6 +94,8 @@ public final class DummySceneWorld implements SceneWorld {
     private final TrackedDummyWorld dummy;
     private final SceneElementResolver resolver;
     private final Map<String, List<BlockPos>> elementPositions;
+    /** 属于「模块位区域」的元素 id（选择器为 {@link ModuleSlot#SELECTOR}），用于单独着色。 */
+    private final Set<String> moduleSlotElementIds;
 
     private final Set<String> visibleSections = new LinkedHashSet<>();
     private final Map<String, Boolean> highlights = new LinkedHashMap<>();
@@ -89,6 +107,7 @@ public final class DummySceneWorld implements SceneWorld {
     private CameraState camera;
     private List<BlockPos> highlightedPositions = List.of();
     private List<BlockPos> outlinedPositions = List.of();
+    private List<BlockPos> moduleSlotOutlinedPositions = List.of();
 
     public DummySceneWorld(StructureSource structure, SceneData scene, LdlibSceneViewport viewport) {
         this.structure = Objects.requireNonNull(structure, "structure must not be null");
@@ -98,6 +117,7 @@ public final class DummySceneWorld implements SceneWorld {
         this.dummy = viewport.dummyWorld();
         this.resolver = new SceneElementResolver(structure);
         this.elementPositions = resolveElementPositions(scene);
+        this.moduleSlotElementIds = resolveModuleSlotElementIds(scene);
         this.sceneWidget.setAfterWorldRender(this::drawOverlays);
         // 分段默认隐藏：由场景的 showSection 步骤逐段揭示（经典「思索」搭建叙事）。
         applyVisibility();
@@ -127,6 +147,31 @@ public final class DummySceneWorld implements SceneWorld {
     /** 某元素解析出的坐标（诊断 / 自动测试）。 */
     public List<BlockPos> elementPositions(String elementId) {
         return elementPositions.getOrDefault(elementId, List.of());
+    }
+
+    /** 场景里以「模块位区域」选择器声明的元素 id 集合（诊断 / 自动测试）。 */
+    public Set<String> moduleSlotElementIds() {
+        return moduleSlotElementIds;
+    }
+
+    /** 已安装模块的槽位占用（槽位元素 id → 模块 id）；快照 / 重放一致。 */
+    public Map<String, String> installedModules() {
+        return Map.copyOf(modules);
+    }
+
+    /** 模块位区域轮廓当前覆盖的单元数（诊断 / 自动测试）。 */
+    public int moduleSlotOutlineCount() {
+        return moduleSlotOutlinedPositions.size();
+    }
+
+    private static Set<String> resolveModuleSlotElementIds(SceneData scene) {
+        Set<String> ids = new LinkedHashSet<>();
+        for (SceneElement element : scene.elements()) {
+            if (ModuleSlot.SELECTOR.equals(SceneParams.string(element.params(), "selector", null))) {
+                ids.add(element.id());
+            }
+        }
+        return Set.copyOf(ids);
     }
 
     /** 当前实际渲染的方块数量（分段显隐的可观察量）。 */
@@ -197,7 +242,7 @@ public final class DummySceneWorld implements SceneWorld {
             return;
         }
         highlights.put(targetId, active);
-        highlightedPositions = unionOfEnabled(highlights);
+        recomputeOverlays();
     }
 
     @Override
@@ -206,7 +251,7 @@ public final class DummySceneWorld implements SceneWorld {
             return;
         }
         outlines.put(targetId, active);
-        outlinedPositions = unionOfEnabled(outlines);
+        recomputeOverlays();
     }
 
     @Override
@@ -231,8 +276,20 @@ public final class DummySceneWorld implements SceneWorld {
 
     @Override
     public void installModule(String slotId, String moduleId) {
-        // 记录状态：模块合并属后续工单；此处保证快照 / 重放一致性。
+        if (slotId == null) {
+            return;
+        }
+        // 有意义的世界效果：把模块位的区域单元替换为「已安装模块」的外观方块，槽位随即被占用；
+        // 空模块位安装后模块才出现（区域单元原本不在任何可建分段内，故此处一并纳入可见集）。
         modules.put(slotId, moduleId);
+        BlockState moduleState = moduleBlockState();
+        if (moduleState != null) {
+            BlockInfo moduleInfo = BlockInfo.fromBlockState(moduleState);
+            for (BlockPos pos : elementPositions.getOrDefault(slotId, List.of())) {
+                dummy.addBlock(pos, moduleInfo);
+            }
+        }
+        applyVisibility();
     }
 
     @Override
@@ -284,8 +341,7 @@ public final class DummySceneWorld implements SceneWorld {
         particles.addAll(snapshot.particles());
         narration = snapshot.narration();
         camera = snapshot.camera();
-        highlightedPositions = unionOfEnabled(highlights);
-        outlinedPositions = unionOfEnabled(outlines);
+        recomputeOverlays();
 
         applyVisibility();
         if (camera != null) {
@@ -300,7 +356,49 @@ public final class DummySceneWorld implements SceneWorld {
         for (String section : visibleSections) {
             union.addAll(elementPositions.getOrDefault(section, List.of()));
         }
+        // 已安装模块的槽位区域始终可见：空模块位安装后模块才出现。
+        for (String slot : modules.keySet()) {
+            union.addAll(elementPositions.getOrDefault(slot, List.of()));
+        }
         viewport.setVisibleBlocks(new ArrayList<>(union));
+    }
+
+    /**
+     * 依据当前高亮 / 轮廓状态重算覆盖层坐标：模块位区域（选择器 {@link ModuleSlot#SELECTOR}）
+     * 单独归类，以便用第三种颜色（绿）与普通仓口轮廓（蓝）区分。
+     */
+    private void recomputeOverlays() {
+        highlightedPositions = unionOfEnabled(highlights);
+        Set<BlockPos> plain = new LinkedHashSet<>();
+        Set<BlockPos> slotRegions = new LinkedHashSet<>();
+        for (Map.Entry<String, Boolean> entry : outlines.entrySet()) {
+            if (!Boolean.TRUE.equals(entry.getValue())) {
+                continue;
+            }
+            List<BlockPos> positions = elementPositions.getOrDefault(entry.getKey(), List.of());
+            if (moduleSlotElementIds.contains(entry.getKey())) {
+                slotRegions.addAll(positions);
+            } else {
+                plain.addAll(positions);
+            }
+        }
+        outlinedPositions = List.copyOf(plain);
+        moduleSlotOutlinedPositions = List.copyOf(slotRegions);
+    }
+
+    /** 已安装模块的外观方块状态；候选全部缺席时返回 {@code null}（不改变几何）。 */
+    private static BlockState moduleBlockState() {
+        for (String blockId : MODULE_BLOCK_CANDIDATES) {
+            ResourceLocation location = ResourceLocation.tryParse(blockId);
+            if (location == null) {
+                continue;
+            }
+            Block block = BuiltInRegistries.BLOCK.get(location);
+            if (block != Blocks.AIR) {
+                return block.defaultBlockState();
+            }
+        }
+        return null;
     }
 
     private List<BlockPos> unionOfEnabled(Map<String, Boolean> flags) {
@@ -331,6 +429,16 @@ public final class DummySceneWorld implements SceneWorld {
             for (BlockPos pos : outlinedPositions) {
                 for (Direction face : Direction.values()) {
                     widget.drawFacingBorder(poseStack, new BlockPosFace(pos, face), OUTLINE_COLOR, 1);
+                }
+            }
+        }
+        // 模块位区域：6 面绿色细线框覆盖区域的每个单元，使「槽位是区域而非单块」在视觉上成立，
+        // 并与控制器（金）/ 仓口（蓝）区分。
+        if (!moduleSlotOutlinedPositions.isEmpty()) {
+            PoseStack poseStack = new PoseStack();
+            for (BlockPos pos : moduleSlotOutlinedPositions) {
+                for (Direction face : Direction.values()) {
+                    widget.drawFacingBorder(poseStack, new BlockPosFace(pos, face), MODULE_SLOT_COLOR, 1);
                 }
             }
         }

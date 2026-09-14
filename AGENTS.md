@@ -42,6 +42,7 @@ $env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成�
 $env:GTSNPONDER_UI_AUTOTEST="editor"; .\gradlew.bat runClient  # 游戏内编辑器自动测试（#9）：载入存档 → 打开编辑器 → 录制 2 步 + 微调时长 → 保存 → 场景库热重载 → 重放并断言编辑后的旁白 → 截图 run/screenshots/gtsnponder-editor.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="catalog"; .\gradlew.bat runClient  # 图鉴目录自动测试（#11）：载入存档 → 清空进度并按需补种子作者场景 → 打开目录 → 断言列表与场景库一致 + 类别覆盖 → 搜索断言（过滤 / 不可能命中 / 清空）→ 播放某条目并断言进度标记已看 → 重开目录断言进度持久 → 截图 3 张 → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="gtgui"; .\gradlew.bat runClient  # GT 机器界面覆盖按钮自动测试（#12，入口 ④）：载入存档 → 放置真实 gtceu:coke_oven 多方块并以 GT 标准路径打开其 GUI → 断言覆盖按钮出现在真实 GT 机器屏上且目标正确 → 经事件总线投递 MouseButtonPressed.Pre 断言点击打开该目标的播放屏 → 断言非 GT 屏不出现 → 截图 run/screenshots/gtsnponder-gtgui{,-player,-nongt}.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="modules"; .\gradlew.bat runClient  # 模块系统演示自动测试（#14）：载入存档 → 以夹具结构源（两个模块位：具名带效果 / 任意模块）生成场景并播放 → 推进到效果汇总帧断言「模块位区域高亮（多单元）+ 安装生效（空槽被占用）+ 效果汇总旁白」→ 截图 run/screenshots/gtsnponder-modules.png → 重播断言 rewind 清除安装、再播断言确定性重现 → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -147,6 +148,31 @@ MultiblockInfoCategory.RECIPE_TYPE, …)` 在 GT 多方块信息页叠加「思�
   在开发世界放置机器并经 `MachineUIFactory.openUI` 打开真实 GUI；覆盖层识别 / 绘制由真实渲染循环驱动，
   点击由 `MinecraftForge.EVENT_BUS.post(new ScreenEvent.MouseButtonPressed.Pre(...))` 投递（与生产
   `MouseHandler` 同型事件）。
+
+### 模块系统演示（#14）
+
+- **数据路径（偏差，见 ADR-0006）**：组织 fork 的模块系统存在，但**现行 fork 无任何生产机器声明模块位**
+  （`GtStructureAdapter.countMachinesDeclaringModuleSlots() == 0`，由 GameTest
+  `adapterReportsNoProductionModuleSlotsYet` latching 自证）。故模块演示以**夹具 `StructureSource` + 注入缝**
+  验证；适配器侧的模块位 / 效果提取由 GameTest 用**合成 `MultiblockMachineDefinition` 注入模块位**、经真实
+  `toSource` 路径覆盖。
+- **效果信息**：`GtStructureAdapter` 用 fork 的 `ModuleEffectSummary.of(module.getEffects())` 读出
+  并行 / 速度 / 能耗 / 输入 / 输出 / 等级，翻译为中性 DTO `ModuleEffectInfo` / `ModuleOption`（随 `ModuleSlot`
+  携带）。GT 访问仍只在 `com.gtsn.ponder.gt`；异常退化为 `ModuleEffectInfo.EMPTY`。
+- **模块位区域**：生成器为每个模块位声明元素 `moduleslot.<i>`（选择器 `moduleslot`，参数 `index`；
+  解析为区域覆盖的**全部单元**，空穴以占位 id 计）并发出 `outline` 覆盖整片区域（非单块）。世界桥用
+  **绿色**（`DummySceneWorld.MODULE_SLOT_COLOR`）区分控制器（金）/ 仓口（蓝）；播放屏常驻图例加一行。
+- **安装演示**：每个可安装模块位——区域高亮 → 可接受模块旁白（具名 `NARRATION_MODULE_SLOT` /
+  任意 `...slot.any` / 无 `...slot.none`）→ `INSTALL_MODULE`（空槽 → 安装一个模块）→ 效果汇总旁白
+  （`NARRATION_MODULE_INSTALLED` / 无效果 `...installed.none`）。取值确定：槽按下标、模块按 id 升序、
+  安装取字典序最小可接受模块；「任意模块」槽安装代表模块 `GENERIC_MODULE_ID`。
+- **有意义的世界效果**：世界桥把槽位区域单元替换为「已安装模块」的外观方块（候选
+  `MODULE_BLOCK_CANDIDATES`，方块 id 属世界桥关注点、不进冻结数据），并把该区域并入可见集（**空槽安装后
+  模块才出现**）；`槽位 → 模块` 占用随 `snapshot` / `restore` 完整还原（seek / rewind 一致）。
+- **证据**：headless 单测 `SceneGeneratorModuleTest`（区域高亮 / 安装顺序 / 效果汇总 / 确定性）、
+  `ModuleSceneSemanticsTest`（安装状态快照 / 重放）、`ModuleSlotTest` / `SceneElementResolverTest`（区域解析）；
+  GameTest `adapterExtractsModuleEffectSummary`；客户端自动测试 `GTSNPONDER_UI_AUTOTEST=modules`（见上）。
+- **文案**：新增模块叙述 / 图例键经 `runData` 产出中英（改动生成器文案后必须重跑并提交产物）。
 
 ### 依赖与类加载纪律
 
