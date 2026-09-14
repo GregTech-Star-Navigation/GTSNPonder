@@ -5,10 +5,13 @@ import com.gtsn.ponder.editor.EditorSession;
 import com.gtsn.ponder.editor.SceneDraft;
 import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.SceneDataWriter;
+import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.gt.GtMultiblockCatalog;
 import com.gtsn.ponder.gt.GtStructureAdapter;
 import com.gtsn.ponder.structure.StructureSource;
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -18,12 +21,15 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -53,7 +59,24 @@ public final class PonderEntrypoints {
     /** 注视判定距离（格）。 */
     public static final double REACH = 5.0d;
 
+    /** 生成场景导出目录（相对 gameDir）：fork 升级后可重生成并 diff 的稳定输出目录。 */
+    public static final String GENERATED_DIRECTORY = "gtsnponder-generated";
+
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     private PonderEntrypoints() {
+    }
+
+    /**
+     * 全部注册的多方块目标 id（稳定排序）——全量覆盖的枚举来源，全部经唯一适配包
+     * {@link GtMultiblockCatalog}（GT import 仍只在该包）。
+     */
+    public static List<String> registeredMultiblockTargets() {
+        List<String> targets = new ArrayList<>();
+        for (GtMultiblockCatalog.Multiblock machine : GtMultiblockCatalog.all()) {
+            targets.add(machine.id());
+        }
+        return List.copyOf(targets);
     }
 
     /** 快捷键入口：打开玩家注视目标（GT 多方块）的思索屏。 */
@@ -96,21 +119,49 @@ public final class PonderEntrypoints {
             message("ponder.gtsnponder.message.no_world");
             return false;
         }
-        Optional<StructureSource> structure = GtStructureAdapter.byId(target);
-        if (structure.isEmpty()) {
+        Optional<Resolved> resolved = resolve(target, forceGenerate);
+        if (resolved.isEmpty()) {
             message("ponder.gtsnponder.message.no_scene", target);
             return false;
         }
-        StructureSource source = structure.get();
-        SceneData scene = forceGenerate ? null : SceneLibrary.get().sceneForTarget(target).orElse(null);
-        if (scene == null) {
-            scene = SceneGenerator.generate(source);
-        }
-        final SceneData sceneToOpen = scene;
-        final StructureSource sourceToOpen = source;
+        Resolved ready = resolved.get();
         minecraft.execute(() -> minecraft.setScreen(
-                new ScenePlayerScreen(sceneToOpen, sourceToOpen, minecraft.level)));
+                new ScenePlayerScreen(ready.scene(), ready.structure(), minecraft.level)));
         return true;
+    }
+
+    /**
+     * 覆盖验证的解析缝（工单 #13）：解析目标的<b>可播场景</b>——手作场景优先（{@link SceneLibrary}），
+     * 否则由真实 GT 多方块结构<b>按需自动生成</b>（{@link SceneGenerator}）。返回空 = 死链（目标不是
+     * 可解析的多方块）：{@link com.gtsn.ponder.catalog.SceneCoverage} 据此算出「零死链」。
+     *
+     * <p>与 {@link #openForTarget} 走同一解析路径，故「目录里能解析 = 真能播」。</p>
+     */
+    public static Optional<SceneData> resolveSceneForTarget(String target) {
+        return resolve(target, false).map(Resolved::scene);
+    }
+
+    /** 已解析的场景 + 其结构源（播放屏两者都需要）。 */
+    private record Resolved(SceneData scene, StructureSource structure) {
+    }
+
+    /**
+     * 手作优先 / 按需生成的统一解析（不打开界面）。目标须是可解析的 GT 多方块（手作场景亦需结构源
+     * 才能渲染）；否则为空（死链）。
+     */
+    private static Optional<Resolved> resolve(String target, boolean forceGenerate) {
+        Optional<StructureSource> structure = GtStructureAdapter.byId(target);
+        if (structure.isEmpty()) {
+            return Optional.empty();
+        }
+        StructureSource source = structure.get();
+        if (!forceGenerate) {
+            SceneData authored = SceneLibrary.get().sceneForTarget(target).orElse(null);
+            if (authored != null) {
+                return Optional.of(new Resolved(authored, source));
+            }
+        }
+        return Optional.of(new Resolved(SceneGenerator.generate(source), source));
     }
 
     /**
@@ -119,7 +170,9 @@ public final class PonderEntrypoints {
      */
     public static boolean openCatalog() {
         Minecraft minecraft = Minecraft.getInstance();
-        minecraft.execute(() -> minecraft.setScreen(new SceneCatalogScreen(SceneLibrary.get().scenes())));
+        List<SceneData> scenes = SceneLibrary.get().scenes();
+        List<String> registeredTargets = registeredMultiblockTargets();
+        minecraft.execute(() -> minecraft.setScreen(new SceneCatalogScreen(scenes, registeredTargets)));
         return true;
     }
 
@@ -206,18 +259,60 @@ public final class PonderEntrypoints {
             message("ponder.gtsnponder.message.no_scene", target);
             return Optional.empty();
         }
-        String json = SceneDataWriter.toJson(SceneGenerator.generate(structure.get()));
-        File directory = new File(Minecraft.getInstance().gameDirectory, "gtsnponder-generated");
+        SceneData scene = SceneGenerator.generate(structure.get());
         try {
-            Files.createDirectories(directory.toPath());
-            Path file = new File(directory, target.replace(':', '_') + ".json").toPath();
-            Files.writeString(file, json, StandardCharsets.UTF_8);
+            Path directory = generatedDirectory();
+            Files.createDirectories(directory);
+            Path file = writeGeneratedScene(directory, target, scene);
             message("ponder.gtsnponder.message.dump", file.toString());
             return Optional.of(file);
         } catch (IOException failure) {
             message("ponder.gtsnponder.message.dump_failed", String.valueOf(failure.getMessage()));
             return Optional.empty();
         }
+    }
+
+    /**
+     * 开发 / 维护入口（工单 #13 的重生成缝）：把<b>全部注册多方块</b>的自动生成场景 JSON 批量导出到
+     * {@code <gameDir>/gtsnponder-generated/}（稳定文件名），供 GT fork 升级后重生成并 diff。
+     * 返回输出目录；写出失败为空。
+     */
+    public static Optional<Path> dumpAllGenerated() {
+        List<String> targets = registeredMultiblockTargets();
+        try {
+            Path directory = generatedDirectory();
+            Files.createDirectories(directory);
+            int written = 0;
+            int skipped = 0;
+            for (String target : targets) {
+                Optional<StructureSource> structure = GtStructureAdapter.byId(target);
+                if (structure.isEmpty()) {
+                    skipped++;
+                    continue;
+                }
+                writeGeneratedScene(directory, target, SceneGenerator.generate(structure.get()));
+                written++;
+            }
+            LOGGER.info("[GTSNPonder] dumped {} generated scene(s) to {} ({} ungeneratable target(s), "
+                    + "{} registered)", written, directory, skipped, targets.size());
+            message("ponder.gtsnponder.message.dump", directory.toString());
+            return Optional.of(directory);
+        } catch (IOException failure) {
+            message("ponder.gtsnponder.message.dump_failed", String.valueOf(failure.getMessage()));
+            return Optional.empty();
+        }
+    }
+
+    /** 生成场景稳定输出目录（{@code <gameDir>/gtsnponder-generated}）。 */
+    public static Path generatedDirectory() {
+        return new File(Minecraft.getInstance().gameDirectory, GENERATED_DIRECTORY).toPath();
+    }
+
+    /** 写出单个生成场景（稳定文件名 = 清洗后的目标 id + {@code .json}）。 */
+    private static Path writeGeneratedScene(Path directory, String target, SceneData scene) throws IOException {
+        Path file = directory.resolve(GeneratedKeys.sanitize(target) + ".json");
+        Files.writeString(file, SceneDataWriter.toJson(scene), StandardCharsets.UTF_8);
+        return file;
     }
 
     private static void message(String key, Object... args) {

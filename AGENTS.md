@@ -44,6 +44,7 @@ $env:GTSNPONDER_UI_AUTOTEST="catalog"; .\gradlew.bat runClient  # 图鉴目录�
 $env:GTSNPONDER_UI_AUTOTEST="gtgui"; .\gradlew.bat runClient  # GT 机器界面覆盖按钮自动测试（#12，入口 ④）：载入存档 → 放置真实 gtceu:coke_oven 多方块并以 GT 标准路径打开其 GUI → 断言覆盖按钮出现在真实 GT 机器屏上且目标正确 → 经事件总线投递 MouseButtonPressed.Pre 断言点击打开该目标的播放屏 → 断言非 GT 屏不出现 → 截图 run/screenshots/gtsnponder-gtgui{,-player,-nongt}.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="modules"; .\gradlew.bat runClient  # 模块系统演示自动测试（#14）：载入存档 → 以夹具结构源（两个模块位：具名带效果 / 任意模块）生成场景并播放 → 推进到效果汇总帧断言「模块位区域高亮（多单元）+ 安装生效（空槽被占用）+ 效果汇总旁白」→ 截图 run/screenshots/gtsnponder-modules.png → 重播断言 rewind 清除安装、再播断言确定性重现 → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="systems"; .\gradlew.bat runClient  # 发电·能量网 / 物流管网内容自动测试（#10）：载入存档 → 断言两类内容各 2 个真实 GT 目标经适配器解析且随包场景为 source=mixed → 打开目录断言「发电与能量 / 物流与管网」两类别各含期望目标 → 点击「相关机器」断言相关导航切到同类别兄弟、「全部」恢复 → 分别播放两类主场景断言步骤数与推进到「线缆熔断 / 覆盖板」概念旁白 → 截图 run/screenshots/gtsnponder-systems-{catalog,related,power,logistics}.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="coverage"; .\gradlew.bat runClient  # 全量覆盖自动测试（#13）：载入存档 → 枚举全部注册多方块（71 台）→ 断言「每台都有可播场景 + 精选关键机器（5 台）有手作讲解 + 零死链」→ 批量重生成全部生成场景到 run/gtsnponder-generated/ → 打开目录断言 71 条全覆盖 + 每条目可解析 → 播放一台按需生成场景断言 source=auto → 截图 run/screenshots/gtsnponder-coverage-{catalog,generated}.png → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -53,7 +54,8 @@ $env:GTSNPONDER_UI_AUTOTEST="systems"; .\gradlew.bat runClient  # 发电·能量
   成型演示 = 隐藏 → 重现 → 成型脉冲。产物 `source=auto` + `generatorVersion=auto-1`，确定性（同源两次
   生成字节相等 JSON，由 `SceneDataWriter` 序列化）。
 - 运行时接线：`/gtsnponder scene <target>` 无手作场景时按需自动生成；`/gtsnponder generate <target>`
-  强制生成并播放；`/gtsnponder dump <target>` 导出生成 JSON 到 `run/gtsnponder-generated/`。
+  强制生成并播放；`/gtsnponder dump <target>` 导出单个生成 JSON 到 `run/gtsnponder-generated/`；
+  `/gtsnponder dumpall` 批量导出**全部注册多方块**的生成 JSON 到同一目录（见「全量覆盖（#13）」）。
 - 取景：相机步骤声明 `fit=true` + `margin`（`FIT_MARGIN=0.90`）；视口层 `CameraFraming` 按结构包围盒
   **与视口纵横比**反算距离并居中，使结构占据视口窄轴约 90%（实测居中、高度 ~92%，消除顶部大黑边）；
   相机步骤排在搭建之前（全程同一取景），`distance` 仍作为不含视口尺寸时的确定性回退值。**关键**：结构方块
@@ -185,6 +187,15 @@ MultiblockInfoCategory.RECIPE_TYPE, …)` 在 GT 多方块信息页叠加「思�
 - **文案**：机器特定（title / intro）+ 概念特定（电压 / 超压 / 熔断、物品 / 流体管道 / 线缆 / 覆盖板）键集中在纯 Java `com.gtsn.ponder.content.SystemSceneKeys`，经 `runData` 产出中英；`SystemScenesTest`（文件驱动 + 播放 / rewind）与 `GeneratedLangKeysTest`（datagen 产物覆盖）守卫。**改动场景 / 文案后必须重跑 `runData` 并提交产物**。
 - **相关机器导航（不落 schema 变更）**：v1 冻结格式无 `related` 字段，故「相关机器」由纯逻辑 `SceneCatalog.relatedTo(entry)` **派生**（同类别，或目标 id 共享显著词元，如 `pyrolyse_oven` 与 `coke_oven` 共享 `oven`），`SceneCatalogScreen` 每条目给「相关机器」按钮，点击即在目录内切换到相关条目（点「全部」/ 选类别 / 搜索退出该视图）。**跨场景「跳转」需新增数据字段（须先开 issue + 落 ADR），本工单不落 schema 变更**，只做目录内导航。
 - **证据**：`SystemScenesTest`（文件驱动：头 / 步骤 / 旁白键 / 类别 / 目录 / 相关 / 播放 / rewind）、`SceneCatalogTest`（相关导航派生规则）、`GeneratedLangKeysTest`（中英产物）、GameTest `systemContentTargetsResolveAndAutoGenerate`（真实目标解析 + 自动生成确定性 + 元素可解析）、客户端自动测试 `GTSNPONDER_UI_AUTOTEST=systems`（见上）。
+
+### 全量覆盖：本体 GT 全部多方块（#13）
+
+- **覆盖契约**：全部注册多方块（`GtMultiblockCatalog.all()`，本 fork 实测 **71 台**）都至少有一条可播场景；无手作者**按需自动生成**（`SceneGenerator`），手作者（`source=hand|mixed`）覆盖之手。实测数字：**71 注册 / 71 可解析 / 5 手作（精选）/ 66 生成 / 0 死链**。
+- **解析缝（单一事实源）**：`PonderEntrypoints.resolveSceneForTarget(target)`——手作场景优先（`SceneLibrary`），否则经 `GtStructureAdapter.byId` + `SceneGenerator.generate` 生成；返回空即死链（目标不是可解析多方块）。播放入口 `openForTarget` 走同一解析，故「目录里能解析 = 真能播」。
+- **目录覆盖**：`SceneCatalog.of(scenes, registeredTargets, progress)` 为**无场景的注册多方块**合成 `source=auto` 条目——键取 `SceneGenerator.sceneIdFor(target)`（与按需生成产物的 `id` 一致，故播放后已看标记能点亮），标题取 datagen 已产出的机器标题键。故图鉴 71 条对全部注册多方块可达、无死链（场景本身仍按需生成，不预先物化）。
+- **覆盖分析（纯 Java，零 MC）**：`com.gtsn.ponder.catalog.SceneCoverage`——`CURATED`（5 台精选关键机器 + 其随包场景资源路径）与 `analyze(registeredTargets, resolve)` 折叠为数字（注册 / 可解析 / 手作 / 生成 / 精选手作讲解 / 死链）。headless 单测、GameTest、客户端自动测试共用该分析器，断言同一套数字。
+- **重生成缝（fork 升级后重生成并 diff）**：客户端命令 **`/gtsnponder dumpall`**（无参数）把全部注册多方块的自动生成场景批量写到 **`run/gtsnponder-generated/`**（稳定文件名 = 清洗后的目标 id + `.json`，共 71 个）。GT fork 升级后：`.\gradlew.bat --offline runClient` → `/gtsnponder dumpall` → `git diff --no-index`（或任意 diff 工具）比较旧 / 新目录即可看到结构变化。单机入口 `/gtsnponder dump <target>` 仍可用。
+- **证据**：headless `SceneCoverageTest`（分析器 + **读取真实随包场景文件**核对精选清单不漂移）、`SceneCatalogTest`（覆盖重载：合成 / 去重 / 已看键）= 单元测试（当前 **265** 项）；GameTest `CoverageGameTests.everyRegisteredMultiblockHasAPlayableScene`（枚举真实注册表：每台结构可解析 → 生成场景每个元素可解析 → 确定性；再经共享分析器核算数字）= **17** 项 GameTest；客户端自动测试 `GTSNPONDER_UI_AUTOTEST=coverage`（见上：数字 + 重生成 + 目录全可达 + 播放按需生成场景 + 截图）。
 
 ### 依赖与类加载纪律
 

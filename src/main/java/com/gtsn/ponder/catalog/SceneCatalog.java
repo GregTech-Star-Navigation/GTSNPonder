@@ -1,6 +1,9 @@
 package com.gtsn.ponder.catalog;
 
 import com.gtsn.ponder.engine.model.SceneData;
+import com.gtsn.ponder.engine.model.Source;
+import com.gtsn.ponder.generate.GeneratedKeys;
+import com.gtsn.ponder.generate.SceneGenerator;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -32,19 +35,48 @@ public final class SceneCatalog {
         this.categories = List.copyOf(categories);
     }
 
-    /** 由场景列表与观看进度构建目录。 */
+    /** 由场景列表与观看进度构建目录（无注册多方块覆盖信息）。 */
     public static SceneCatalog of(List<SceneData> scenes, WatchedProgress progress) {
+        return of(scenes, List.of(), progress);
+    }
+
+    /**
+     * 由场景列表 + <b>已注册多方块目标</b> + 观看进度构建目录（工单 #13 全量覆盖）。
+     *
+     * <p>已加载的场景照常成为条目；对<b>没有对应场景</b>的注册多方块目标，合成一条 {@code source=auto}
+     * 的条目——其键取 {@link SceneGenerator#sceneIdFor(String)}（与「按需自动生成」产物的 {@code id}
+     * 一致，故播放后写入的观看进度能点亮该条目的已看标记），标题取 datagen 已产出的机器标题键，
+     * 类别由目标 id 关键词派生。这样图鉴目录对<b>每一台注册多方块</b>都给出可播放条目（无机器缺席 /
+     * 无死链），而场景本身仍在播放时按需生成、不预先物化。</p>
+     *
+     * <p>条目去重：已由场景覆盖的目标不会再被合成；重复的注册目标只计一次。</p>
+     */
+    public static SceneCatalog of(List<SceneData> scenes, List<String> registeredTargets,
+            WatchedProgress progress) {
         WatchedProgress watched = progress == null ? WatchedProgress.empty() : progress;
         List<CatalogEntry> entries = new ArrayList<>();
+        Set<String> coveredTargets = new HashSet<>();
         if (scenes != null) {
             for (SceneData scene : scenes) {
                 if (scene == null || scene.target() == null || scene.target().isBlank()) {
                     continue;
                 }
+                coveredTargets.add(scene.target());
                 String key = WatchedProgress.keyOf(scene);
                 String category = SceneCategories.categoryOf(scene);
                 entries.add(new CatalogEntry(key, scene.target(), scene.title(), scene.source(),
                         category, watched.isWatched(key)));
+            }
+        }
+        if (registeredTargets != null) {
+            for (String target : registeredTargets) {
+                if (target == null || target.isBlank() || !coveredTargets.add(target)) {
+                    continue;
+                }
+                String key = SceneGenerator.sceneIdFor(target);
+                String category = SceneCategories.classify(target);
+                entries.add(new CatalogEntry(key, target, GeneratedKeys.machineTitleKey(target),
+                        Source.AUTO, category, watched.isWatched(key)));
             }
         }
         entries.sort(Comparator.comparingInt((CatalogEntry entry) -> SceneCategories.orderIndex(entry.category()))

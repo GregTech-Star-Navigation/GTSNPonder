@@ -74,6 +74,18 @@ public final class SceneGenerator {
     /** 生成器版本：产物可重生成 / 可 diff 的标识（写入 {@code generatorVersion}）。 */
     public static final String GENERATOR_VERSION = "auto-1";
 
+    /** 自动生成场景 id 前缀（后缀为清洗后的目标 id）；目录 / 进度键与产物 id 共用此推导。 */
+    public static final String SCENE_ID_PREFIX = "gtsnponder:auto_";
+
+    /**
+     * 目标 id → 自动生成场景的稳定 {@code id}（{@code gtsnponder:auto_<sanitized>}）。
+     * 图鉴目录为「无手作场景的注册多方块」合成条目时用同一推导，保证条目键与播放后写入的
+     * 观看进度键一致（否则已看标记永远点不亮）。
+     */
+    public static String sceneIdFor(String targetId) {
+        return SCENE_ID_PREFIX + GeneratedKeys.sanitize(targetId);
+    }
+
     /** 逐层搭建分段元素 ID 前缀（后缀为结构局部 Y）。 */
     public static final String SECTION_LAYER_PREFIX = "section.layer.";
     /** 角色分组搭建分段元素 ID 前缀（后缀为 {@link StructureRole} 名）。 */
@@ -188,7 +200,7 @@ public final class SceneGenerator {
 
         return SceneData.builder()
                 .formatVersion(SceneDataParser.CURRENT_FORMAT_VERSION)
-                .id("gtsnponder:auto_" + GeneratedKeys.sanitize(source.id()))
+                .id(sceneIdFor(source.id()))
                 .title(GeneratedKeys.machineTitleKey(source.id()))
                 .target(source.id())
                 .variant("default")

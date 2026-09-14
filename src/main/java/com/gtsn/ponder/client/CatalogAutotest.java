@@ -3,7 +3,6 @@ package com.gtsn.ponder.client;
 import com.gtsn.ponder.GTSNPonder;
 import com.gtsn.ponder.catalog.CatalogEntry;
 import com.gtsn.ponder.catalog.SceneCatalog;
-import com.gtsn.ponder.catalog.WatchedProgress;
 import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.gt.GtStructureAdapter;
@@ -172,15 +171,23 @@ public final class CatalogAutotest {
             fail(minecraft, "catalog is empty");
             return;
         }
-        Set<String> catalogKeys = catalog.entries().stream().map(CatalogEntry::key)
+        // 工单 #13 起，目录是「已加载场景 ∪ 全部注册多方块（按需生成的合成条目）」的覆盖超集，
+        // 故断言：目录包含全部已加载手作场景的目标，且条目数不少于手作场景数（覆盖语义见
+        // coverage 自动测试）。
+        Set<String> catalogTargets = catalog.entries().stream().map(CatalogEntry::target)
                 .collect(Collectors.toSet());
-        Set<String> libraryKeys = SceneLibrary.get().scenes().stream()
+        Set<String> libraryTargets = SceneLibrary.get().scenes().stream()
                 .filter(scene -> scene.target() != null && !scene.target().isBlank())
-                .map(WatchedProgress::keyOf)
+                .map(SceneData::target)
                 .collect(Collectors.toSet());
-        if (!catalogKeys.equals(libraryKeys)) {
-            fail(minecraft, "catalog entries do not match the loaded library: catalog=" + catalogKeys
-                    + " library=" + libraryKeys);
+        if (!catalogTargets.containsAll(libraryTargets)) {
+            fail(minecraft, "catalog is missing loaded library targets: missing="
+                    + libraryTargets.stream().filter(target -> !catalogTargets.contains(target)).toList());
+            return;
+        }
+        if (catalog.total() < libraryTargets.size()) {
+            fail(minecraft, "catalog has fewer entries than loaded library scenes: catalog="
+                    + catalog.total() + " library=" + libraryTargets.size());
             return;
         }
         if (screen.visibleEntries().size() != catalog.total()) {
@@ -282,7 +289,9 @@ public final class CatalogAutotest {
             return;
         }
         playedTarget = screen.catalog().entries().get(0).target();
-        SceneData played = SceneLibrary.get().sceneForTarget(playedTarget).orElse(null);
+        // 工单 #13：目录条目可能是「无手作场景的注册多方块」的合成条目，故经真实解析缝解析（手作优先、
+        // 否则按需生成），而非只查手作场景库。
+        SceneData played = PonderEntrypoints.resolveSceneForTarget(playedTarget).orElse(null);
         if (played == null || PonderProgress.get().isWatched(played)) {
             fail(minecraft, "target " + playedTarget + " is missing or unexpectedly already watched");
             return;
@@ -331,7 +340,7 @@ public final class CatalogAutotest {
         if (screen.renderedFrames() < 4) {
             return;
         }
-        SceneData played = SceneLibrary.get().sceneForTarget(playedTarget).orElse(null);
+        SceneData played = PonderEntrypoints.resolveSceneForTarget(playedTarget).orElse(null);
         if (played == null) {
             fail(minecraft, "scene for " + playedTarget + " disappeared after playing");
             return;

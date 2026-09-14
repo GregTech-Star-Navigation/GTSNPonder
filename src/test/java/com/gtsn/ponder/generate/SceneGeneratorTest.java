@@ -192,6 +192,16 @@ class SceneGeneratorTest {
         assertTrue(scene.title().startsWith(GeneratedKeys.MACHINE_TITLE_PREFIX), scene.title());
     }
 
+    @Test
+    void generatedSceneIdMatchesSceneIdForTheTarget() {
+        // 图鉴目录为「无场景的注册多方块」合成条目时复用同一推导，故这里锁定二者一致。
+        for (StructureSource source : List.of(small(), medium(), large())) {
+            SceneData scene = SceneGenerator.generate(source);
+            assertEquals(SceneGenerator.sceneIdFor(source.id()), scene.id());
+            assertTrue(scene.id().startsWith(SceneGenerator.SCENE_ID_PREFIX), scene.id());
+        }
+    }
+
     // --- 构建顺序 / 预算切换 --------------------------------------------------
 
     @Test

@@ -2,6 +2,8 @@ package com.gtsn.ponder.catalog;
 
 import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.Source;
+import com.gtsn.ponder.generate.GeneratedKeys;
+import com.gtsn.ponder.generate.SceneGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -188,5 +190,81 @@ class SceneCatalogTest {
         assertEquals(Set.of("coke", "oven"), SceneCatalog.targetTokens("gtceu:coke_oven"));
         assertTrue(SceneCatalog.targetTokens(null).isEmpty());
         assertTrue(SceneCatalog.targetTokens("gtceu:multi").isEmpty());
+    }
+
+    // --- 全量覆盖（工单 #13）：为无场景的注册多方块合成按需生成条目 ------------------
+
+    @Test
+    void coverageOverloadSynthesizesAutoEntriesForRegisteredTargetsWithoutAScene() {
+        List<SceneData> scenes = List.of(scene("gtceu:coke_oven.scene", "gtceu:coke_oven", Source.HAND));
+
+        SceneCatalog catalog = SceneCatalog.of(scenes,
+                List.of("gtceu:coke_oven", "gtceu:steam_grinder"), WatchedProgress.empty());
+
+        assertEquals(2, catalog.total(), "the covered target keeps its scene; the uncovered one is synthesized");
+        CatalogEntry synthesized = catalog.entries().stream()
+                .filter(entry -> entry.target().equals("gtceu:steam_grinder"))
+                .findFirst().orElseThrow();
+        assertEquals(Source.AUTO, synthesized.source());
+        assertEquals(SceneGenerator.sceneIdFor("gtceu:steam_grinder"), synthesized.key(),
+                "the synthesized key must equal the on-demand generated scene id");
+        assertEquals(GeneratedKeys.machineTitleKey("gtceu:steam_grinder"), synthesized.titleKey());
+        assertEquals(SceneCategories.STEAM, synthesized.category());
+    }
+
+    @Test
+    void coverageOverloadDoesNotSynthesizeWhenASceneAlreadyCoversTheTarget() {
+        List<SceneData> scenes = List.of(scene("gtceu:coke_oven.scene", "gtceu:coke_oven", Source.HAND));
+
+        SceneCatalog catalog = SceneCatalog.of(scenes, List.of("gtceu:coke_oven"), WatchedProgress.empty());
+
+        assertEquals(1, catalog.total(), "an already-covered registered target must not be duplicated");
+        assertEquals(Source.HAND, catalog.entries().get(0).source());
+        assertEquals("gtceu:coke_oven.scene", catalog.entries().get(0).key());
+    }
+
+    @Test
+    void coverageOverloadDeduplicatesAndIgnoresBlankRegisteredTargets() {
+        SceneCatalog catalog = SceneCatalog.of(List.of(),
+                List.of("gtceu:a", "gtceu:a", "   ", "gtceu:b"), WatchedProgress.empty());
+
+        assertEquals(2, catalog.total());
+        assertEquals(List.of("gtceu:a", "gtceu:b"),
+                catalog.entries().stream().map(CatalogEntry::target).toList());
+    }
+
+    @Test
+    void synthesizedEntryWatchedKeyMatchesTheGeneratedSceneId() {
+        // 播放按需生成的场景会把 WatchedProgress.keyOf(scene)（= SceneGenerator.sceneIdFor(target)）
+        // 标记为已看；目录用同一键，故已看标记能点亮。
+        WatchedProgress progress = WatchedProgress.empty().with(SceneGenerator.sceneIdFor("gtceu:steam_grinder"));
+
+        SceneCatalog catalog = SceneCatalog.of(List.of(), List.of("gtceu:steam_grinder"), progress);
+
+        assertEquals(1, catalog.total());
+        assertTrue(catalog.entries().get(0).watched());
+        assertEquals(1, catalog.watchedCount());
+    }
+
+    @Test
+    void synthesizedEntriesAreClassifiedByTargetKeywords() {
+        SceneCatalog catalog = SceneCatalog.of(List.of(),
+                List.of("gtceu:steam_grinder", "gtceu:item_pipe", "gtceu:large_combustion_engine"),
+                WatchedProgress.empty());
+
+        assertEquals(SceneCategories.STEAM, catalog.entries().stream()
+                .filter(entry -> entry.target().equals("gtceu:steam_grinder")).findFirst().orElseThrow().category());
+        assertEquals(SceneCategories.LOGISTICS, catalog.entries().stream()
+                .filter(entry -> entry.target().equals("gtceu:item_pipe")).findFirst().orElseThrow().category());
+        assertEquals(SceneCategories.POWER, catalog.entries().stream()
+                .filter(entry -> entry.target().equals("gtceu:large_combustion_engine"))
+                .findFirst().orElseThrow().category());
+    }
+
+    @Test
+    void legacyOverloadIgnoresRegisteredTargets() {
+        SceneCatalog catalog = SceneCatalog.of(
+                List.of(scene("gtceu:coke_oven.scene", "gtceu:coke_oven", Source.HAND)), WatchedProgress.empty());
+        assertEquals(1, catalog.total());
     }
 }

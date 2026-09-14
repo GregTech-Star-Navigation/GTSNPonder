@@ -52,6 +52,7 @@ public final class SceneCatalogScreen extends GtsnScreen {
     private static final int RELATED_WIDTH = 56;
 
     private final List<SceneData> scenes;
+    private final List<String> registeredTargets;
     private final TextMetrics metrics;
 
     private String query = "";
@@ -72,9 +73,16 @@ public final class SceneCatalogScreen extends GtsnScreen {
 
     private int renderedFrames;
 
-    public SceneCatalogScreen(List<SceneData> scenes) {
+    /**
+     * @param scenes            已加载的手作 / 随包场景
+     * @param registeredTargets 全部注册多方块目标（无对应场景者合成 {@code source=auto} 条目，
+     *                          使目录对每台注册多方块都可播——工单 #13 全量覆盖）
+     */
+    public SceneCatalogScreen(List<SceneData> scenes, List<String> registeredTargets) {
         super(Component.translatable(CatalogKeys.TITLE), new PanelWidget().fill());
         this.scenes = List.copyOf(Objects.requireNonNull(scenes, "scenes must not be null"));
+        this.registeredTargets = List.copyOf(
+                Objects.requireNonNull(registeredTargets, "registeredTargets must not be null"));
         this.metrics = new ThemeFontMetrics(Minecraft.getInstance().font);
         rebuild();
     }
@@ -176,7 +184,7 @@ public final class SceneCatalogScreen extends GtsnScreen {
 
     /** 重建控件树：重算目录 / 过滤并重新布局（组件无可见性属性，故整树重建）。 */
     private void rebuild() {
-        this.catalog = SceneCatalog.of(scenes, PonderProgress.get().snapshot());
+        this.catalog = SceneCatalog.of(scenes, registeredTargets, PonderProgress.get().snapshot());
         setRoot(buildRoot());
         host().resize(width, height);
     }

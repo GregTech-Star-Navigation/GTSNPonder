@@ -20,7 +20,9 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
  *         <li>{@code /gtsnponder scene [target]}——无快捷键场景的确定性入口（有手作用手作，无则自动生成）；</li>
  *         <li>{@code /gtsnponder generate <target>}——强制自动生成并播放（开发者 / 自动测试）；</li>
  *         <li>{@code /gtsnponder dump <target>}——把自动生成的场景 JSON 导出到
- *             {@code run/gtsnponder-generated/}（作者草稿起点 / 生成器 diff）。</li>
+ *             {@code run/gtsnponder-generated/}（作者草稿起点 / 生成器 diff）；</li>
+ *         <li>{@code /gtsnponder dumpall}——把<b>全部注册多方块</b>的自动生成场景批量导出到
+ *             {@code run/gtsnponder-generated/}，供 GT fork 升级后重生成并 diff（工单 #13）。</li>
  *         <li>{@code /gtsnponder editor [target]}——打开游戏内可视化编辑器（<b>门控</b>：仅作者 / 开发，
  *             正式玩家不可见）；</li>
  *         <li>{@code /gtsnponder export <target>}——把自动生成场景导出为手作草稿到可写作者目录（门控）。</li>
@@ -56,6 +58,8 @@ public final class PonderClientEvents {
                         .then(Commands.argument("target", StringArgumentType.string())
                                 .executes(context -> PonderEntrypoints.dumpGenerated(
                                         StringArgumentType.getString(context, "target")).isPresent() ? 1 : 0)))
+                .then(Commands.literal("dumpall")
+                        .executes(context -> PonderEntrypoints.dumpAllGenerated().isPresent() ? 1 : 0))
                 .then(Commands.literal("editor")
                         .executes(context -> PonderEntrypoints.openEditorForLookedAtTarget() ? 1 : 0)
                         .then(Commands.argument("target", StringArgumentType.string())
