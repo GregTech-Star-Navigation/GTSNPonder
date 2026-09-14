@@ -1,0 +1,80 @@
+{
+  "formatVersion": 1,
+  "id": "gtsnponder:power_transformer",
+  "title": "ponder.gtsnponder.power.transformer.title",
+  "target": "gtceu:active_transformer",
+  "variant": "default",
+  "source": "mixed",
+  "generatorVersion": "hand-1",
+  "elements": [
+    {
+      "id": "shell",
+      "kind": "section",
+      "params": { "selector": "all" }
+    },
+    {
+      "id": "controller",
+      "kind": "anchor",
+      "params": { "selector": "controller" }
+    }
+  ],
+  "steps": [
+    {
+      "id": "reveal_shell",
+      "type": "showSection",
+      "duration": 30,
+      "targets": ["shell"]
+    },
+    {
+      "id": "talk_intro",
+      "type": "text",
+      "duration": 45,
+      "narration": "ponder.gtsnponder.power.transformer.narration.intro",
+      "narrationArgs": ["gtceu:active_transformer"]
+    },
+    {
+      "id": "frame",
+      "type": "camera",
+      "duration": 0,
+      "targets": ["controller"],
+      "params": { "yaw": 25.0, "pitch": -135.0, "distance": 8.0 }
+    },
+    {
+      "id": "highlight_controller",
+      "type": "highlight",
+      "duration": 25,
+      "targets": ["controller"],
+      "params": { "visible": true }
+    },
+    {
+      "id": "talk_controller",
+      "type": "text",
+      "duration": 45,
+      "narration": "ponder.gtsnponder.power.narration.controller"
+    },
+    {
+      "id": "talk_voltage",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.power.narration.voltage"
+    },
+    {
+      "id": "talk_overvoltage",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.power.narration.overvoltage"
+    },
+    {
+      "id": "talk_burning",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.power.narration.burning"
+    },
+    {
+      "id": "formed",
+      "type": "formedPulse",
+      "duration": 20,
+      "targets": ["controller"]
+    }
+  ]
+}

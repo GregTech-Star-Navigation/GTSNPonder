@@ -43,6 +43,7 @@ $env:GTSNPONDER_UI_AUTOTEST="editor"; .\gradlew.bat runClient  # 游戏内编辑
 $env:GTSNPONDER_UI_AUTOTEST="catalog"; .\gradlew.bat runClient  # 图鉴目录自动测试（#11）：载入存档 → 清空进度并按需补种子作者场景 → 打开目录 → 断言列表与场景库一致 + 类别覆盖 → 搜索断言（过滤 / 不可能命中 / 清空）→ 播放某条目并断言进度标记已看 → 重开目录断言进度持久 → 截图 3 张 → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="gtgui"; .\gradlew.bat runClient  # GT 机器界面覆盖按钮自动测试（#12，入口 ④）：载入存档 → 放置真实 gtceu:coke_oven 多方块并以 GT 标准路径打开其 GUI → 断言覆盖按钮出现在真实 GT 机器屏上且目标正确 → 经事件总线投递 MouseButtonPressed.Pre 断言点击打开该目标的播放屏 → 断言非 GT 屏不出现 → 截图 run/screenshots/gtsnponder-gtgui{,-player,-nongt}.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="modules"; .\gradlew.bat runClient  # 模块系统演示自动测试（#14）：载入存档 → 以夹具结构源（两个模块位：具名带效果 / 任意模块）生成场景并播放 → 推进到效果汇总帧断言「模块位区域高亮（多单元）+ 安装生效（空槽被占用）+ 效果汇总旁白」→ 截图 run/screenshots/gtsnponder-modules.png → 重播断言 rewind 清除安装、再播断言确定性重现 → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="systems"; .\gradlew.bat runClient  # 发电·能量网 / 物流管网内容自动测试（#10）：载入存档 → 断言两类内容各 2 个真实 GT 目标经适配器解析且随包场景为 source=mixed → 打开目录断言「发电与能量 / 物流与管网」两类别各含期望目标 → 点击「相关机器」断言相关导航切到同类别兄弟、「全部」恢复 → 分别播放两类主场景断言步骤数与推进到「线缆熔断 / 覆盖板」概念旁白 → 截图 run/screenshots/gtsnponder-systems-{catalog,related,power,logistics}.png → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -173,6 +174,17 @@ MultiblockInfoCategory.RECIPE_TYPE, …)` 在 GT 多方块信息页叠加「思�
   `ModuleSceneSemanticsTest`（安装状态快照 / 重放）、`ModuleSlotTest` / `SceneElementResolverTest`（区域解析）；
   GameTest `adapterExtractsModuleEffectSummary`；客户端自动测试 `GTSNPONDER_UI_AUTOTEST=modules`（见上）。
 - **文案**：新增模块叙述 / 图例键经 `runData` 产出中英（改动生成器文案后必须重跑并提交产物）。
+
+### 发电·能量网 / 物流管网内容（#10）
+
+- **两类内容**：`发电与能量网` 与 `物流管网`（目录类别键 `power` / `logistics`，显示名 `发电与能量` / `物流与管网`；类别由目标 id 关键词派生，规则见 `SceneCategories`）。每类**两条随包场景**（各至少一条，另加一条同类别「相关机器」以支撑目录跳转），均为 `source=mixed`：结构揭示用稳定选择器（`all` / `controller`）**在运行时从真实 GT 多方块解析**（与自动生成器同源的结构数据），旁白为手作概念课。
+- **真实目标（全部经适配器解析，入口 ①②③④ 均可解析）**：
+  - 发电：`gtceu:large_combustion_engine`（`power_energy.json`，发电 / 电压等级 / 超压 / 线缆熔断）、`gtceu:active_transformer`（`power_transformer.json`，变压器换压）。
+  - 物流：`gtceu:steel_multiblock_tank`（`logistics_network.json`，流体储罐 / 管网）、`gtceu:primitive_pump`（`logistics_pump.json`，泵送）。
+  - 每台目标同时可被 `SceneGenerator` 自动生成「结构演示」（`source=auto`），见 GameTest `systemContentTargetsResolveAndAutoGenerate`。
+- **文案**：机器特定（title / intro）+ 概念特定（电压 / 超压 / 熔断、物品 / 流体管道 / 线缆 / 覆盖板）键集中在纯 Java `com.gtsn.ponder.content.SystemSceneKeys`，经 `runData` 产出中英；`SystemScenesTest`（文件驱动 + 播放 / rewind）与 `GeneratedLangKeysTest`（datagen 产物覆盖）守卫。**改动场景 / 文案后必须重跑 `runData` 并提交产物**。
+- **相关机器导航（不落 schema 变更）**：v1 冻结格式无 `related` 字段，故「相关机器」由纯逻辑 `SceneCatalog.relatedTo(entry)` **派生**（同类别，或目标 id 共享显著词元，如 `pyrolyse_oven` 与 `coke_oven` 共享 `oven`），`SceneCatalogScreen` 每条目给「相关机器」按钮，点击即在目录内切换到相关条目（点「全部」/ 选类别 / 搜索退出该视图）。**跨场景「跳转」需新增数据字段（须先开 issue + 落 ADR），本工单不落 schema 变更**，只做目录内导航。
+- **证据**：`SystemScenesTest`（文件驱动：头 / 步骤 / 旁白键 / 类别 / 目录 / 相关 / 播放 / rewind）、`SceneCatalogTest`（相关导航派生规则）、`GeneratedLangKeysTest`（中英产物）、GameTest `systemContentTargetsResolveAndAutoGenerate`（真实目标解析 + 自动生成确定性 + 元素可解析）、客户端自动测试 `GTSNPONDER_UI_AUTOTEST=systems`（见上）。
 
 ### 依赖与类加载纪律
 

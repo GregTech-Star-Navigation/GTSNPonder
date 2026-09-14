@@ -31,6 +31,10 @@ public final class CatalogKeys {
     public static final String EMPTY = "ponder.gtsnponder.catalog.empty";
     /** 关闭按钮。 */
     public static final String CLOSE = "ponder.gtsnponder.catalog.close";
+    /** 条目的「相关机器」导航按钮（在目录内跳转到同类别 / 同机器族条目）。 */
+    public static final String RELATED = "ponder.gtsnponder.catalog.related";
+    /** 「相关机器」视图的标题模板（参数：锚点目标）。 */
+    public static final String RELATED_TO = "ponder.gtsnponder.catalog.related_to";
 
     /** XEI（JEI/EMI）机器页「思索」按钮的悬浮提示。 */
     public static final String XEI_OPEN = "ponder.gtsnponder.xei.open";

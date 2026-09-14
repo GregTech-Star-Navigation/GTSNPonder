@@ -49,12 +49,14 @@ public final class SceneCatalogScreen extends GtsnScreen {
     private static final int ROW_HEIGHT = 18;
     private static final int MARK_WIDTH = 40;
     private static final int PLAY_WIDTH = 52;
+    private static final int RELATED_WIDTH = 56;
 
     private final List<SceneData> scenes;
     private final TextMetrics metrics;
 
     private String query = "";
     private String selectedCategory;
+    private CatalogEntry relatedAnchor;
 
     private SceneCatalog catalog;
     private EditorTextField searchField;
@@ -62,6 +64,7 @@ public final class SceneCatalogScreen extends GtsnScreen {
     private final List<ButtonWidget> categoryButtons = new ArrayList<>();
     private final List<String> categoryOrder = new ArrayList<>();
     private final List<ButtonWidget> visiblePlayButtons = new ArrayList<>();
+    private final List<ButtonWidget> visibleRelatedButtons = new ArrayList<>();
     private List<CatalogEntry> visibleEntries = List.of();
     private TextWidget progressLabel;
     private TextWidget emptyLabel;
@@ -88,6 +91,16 @@ public final class SceneCatalogScreen extends GtsnScreen {
 
     public List<ButtonWidget> visiblePlayButtons() {
         return List.copyOf(visiblePlayButtons);
+    }
+
+    /** 与 {@link #visibleEntries()} 对齐的「相关机器」按钮（自动测试可点击）。 */
+    public List<ButtonWidget> visibleRelatedButtons() {
+        return List.copyOf(visibleRelatedButtons);
+    }
+
+    /** 当前「相关机器」导航锚点；{@code null} = 未进入相关视图。 */
+    public CatalogEntry relatedAnchor() {
+        return relatedAnchor;
     }
 
     public EditorTextField searchField() {
@@ -131,17 +144,32 @@ public final class SceneCatalogScreen extends GtsnScreen {
     /** 程序化设置搜索词并重建（自动测试 / 外部驱动用）。 */
     public void setQuery(String value) {
         this.query = value == null ? "" : value;
+        this.relatedAnchor = null;
         rebuild();
     }
 
     /** 程序化选择类别（{@code null} = 全部）并重建。 */
     public void selectCategory(String category) {
         this.selectedCategory = category;
+        this.relatedAnchor = null;
+        rebuild();
+    }
+
+    /**
+     * 「相关机器」导航（目录内跳转，冻结 v1 格式无 {@code related} 字段，故由
+     * {@link SceneCatalog#relatedTo(CatalogEntry)} 派生）：以条目为锚点，列表切换为其相关条目
+     * （同类别 / 同机器族），并清空搜索与类别过滤。点「全部」/ 选类别 / 搜索即退出该视图。
+     */
+    public void showRelated(CatalogEntry entry) {
+        this.relatedAnchor = entry;
+        this.query = "";
+        this.selectedCategory = null;
         rebuild();
     }
 
     private void onQueryChanged(String value) {
         this.query = value == null ? "" : value;
+        this.relatedAnchor = null;
         rebuild();
         host().router().focus().requestFocus(searchField);
     }
@@ -162,6 +190,14 @@ public final class SceneCatalogScreen extends GtsnScreen {
         header.add(new TextWidget(localized(CatalogKeys.TITLE), metrics).colorRole(ThemeColorRole.TEXT_STRONG));
         header.add(new SpacerWidget().weight(1));
         progressLabel = header.add(new TextWidget(progressString(), metrics).colorRole(ThemeColorRole.TEXT_MUTED));
+
+        if (relatedAnchor != null) {
+            Stack relatedRow = root.add(hstack());
+            relatedRow.add(new TextWidget(
+                    Component.translatable(CatalogKeys.RELATED_TO, displayTitle(relatedAnchor)).getString(), metrics)
+                    .colorRole(ThemeColorRole.TEXT_STRONG));
+            relatedRow.add(new SpacerWidget().weight(1));
+        }
 
         Stack searchRow = root.add(hstack());
         searchRow.add(new TextWidget(localized(CatalogKeys.SEARCH), metrics).colorRole(ThemeColorRole.TEXT_MUTED)
@@ -188,6 +224,7 @@ public final class SceneCatalogScreen extends GtsnScreen {
         Stack listContent = list.add(new Stack(Direction.VERTICAL).fillWidth().gap(2).padding(Insets.all(2)));
         visibleEntries = filterVisible();
         visiblePlayButtons.clear();
+        visibleRelatedButtons.clear();
         if (visibleEntries.isEmpty()) {
             emptyLabel = listContent.add(new TextWidget(localized(CatalogKeys.EMPTY), metrics)
                     .colorRole(ThemeColorRole.TEXT_MUTED));
@@ -215,11 +252,16 @@ public final class SceneCatalogScreen extends GtsnScreen {
                 .size(Sizing.fill(), Sizing.fixed(ROW_HEIGHT)));
         row.add(new TextWidget(entry.target() == null ? "" : entry.target(), metrics)
                 .colorRole(ThemeColorRole.TEXT_MUTED));
+        visibleRelatedButtons.add(row.add(new ButtonWidget(localized(CatalogKeys.RELATED), metrics,
+                () -> showRelated(entry)).fixedSize(RELATED_WIDTH, BUTTON_HEIGHT)));
         return row.add(new ButtonWidget(localized(CatalogKeys.PLAY), metrics, () -> play(entry))
                 .fixedSize(PLAY_WIDTH, BUTTON_HEIGHT));
     }
 
     private List<CatalogEntry> filterVisible() {
+        if (relatedAnchor != null) {
+            return catalog.relatedTo(relatedAnchor);
+        }
         return catalog.search(query).stream()
                 .filter(entry -> selectedCategory == null || selectedCategory.equals(entry.category()))
                 .toList();

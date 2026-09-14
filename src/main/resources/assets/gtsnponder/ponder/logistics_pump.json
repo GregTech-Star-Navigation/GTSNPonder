@@ -1,0 +1,86 @@
+{
+  "formatVersion": 1,
+  "id": "gtsnponder:logistics_pump",
+  "title": "ponder.gtsnponder.logistics.pump.title",
+  "target": "gtceu:primitive_pump",
+  "variant": "default",
+  "source": "mixed",
+  "generatorVersion": "hand-1",
+  "elements": [
+    {
+      "id": "shell",
+      "kind": "section",
+      "params": { "selector": "all" }
+    },
+    {
+      "id": "controller",
+      "kind": "anchor",
+      "params": { "selector": "controller" }
+    }
+  ],
+  "steps": [
+    {
+      "id": "reveal_shell",
+      "type": "showSection",
+      "duration": 30,
+      "targets": ["shell"]
+    },
+    {
+      "id": "talk_intro",
+      "type": "text",
+      "duration": 45,
+      "narration": "ponder.gtsnponder.logistics.pump.narration.intro",
+      "narrationArgs": ["gtceu:primitive_pump"]
+    },
+    {
+      "id": "frame",
+      "type": "camera",
+      "duration": 0,
+      "targets": ["controller"],
+      "params": { "yaw": 25.0, "pitch": -135.0, "distance": 6.0 }
+    },
+    {
+      "id": "highlight_controller",
+      "type": "highlight",
+      "duration": 25,
+      "targets": ["controller"],
+      "params": { "visible": true }
+    },
+    {
+      "id": "talk_controller",
+      "type": "text",
+      "duration": 45,
+      "narration": "ponder.gtsnponder.logistics.narration.controller"
+    },
+    {
+      "id": "talk_item_pipes",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.logistics.narration.item_pipes"
+    },
+    {
+      "id": "talk_fluid_pipes",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.logistics.narration.fluid_pipes"
+    },
+    {
+      "id": "talk_cables",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.logistics.narration.cables"
+    },
+    {
+      "id": "talk_covers",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.logistics.narration.covers"
+    },
+    {
+      "id": "formed",
+      "type": "formedPulse",
+      "duration": 20,
+      "targets": ["controller"]
+    }
+  ]
+}

@@ -4,8 +4,10 @@ import com.gtsn.ponder.engine.model.SceneData;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -17,6 +19,10 @@ import java.util.Set;
  * {@link SceneCategories} 的类别顺序、再按目标排序，保证目录稳定。</p>
  */
 public final class SceneCatalog {
+
+    /** 通用词元：出现频率高且不构成机器族标识，剔除以免产生虚假的「相关」关系。 */
+    private static final Set<String> GENERIC_TOKENS = Set.of(
+            "large", "small", "multiblock", "multi", "primitive", "basic");
 
     private final List<CatalogEntry> entries;
     private final List<String> categories;
@@ -67,6 +73,64 @@ public final class SceneCatalog {
     /** 搜索（键 / 目标 / 标题键 / 类别，大小写不敏感）；空白返回全部。 */
     public List<CatalogEntry> search(String query) {
         return entries.stream().filter(entry -> entry.matches(query)).toList();
+    }
+
+    /**
+     * 「相关机器」导航（纯 Java，零 MC；v1 冻结格式无 {@code related} 字段，故由可测规则派生）：
+     * 与给定条目相关的其它条目——<b>同类别</b>，或目标 id 共享一个<b>显著词元</b>（机器族，
+     * 见 {@link #targetTokens(String)}）。结果保持目录的稳定顺序、去重且排除自身。
+     *
+     * <p>这是跨场景「跳转」在冻结 schema 下的降级实现：目录内导航到相关条目 / 类别，
+     * 而非场景内跳转（后者需新增 {@code related} 字段，须先开 issue + 落 ADR）。</p>
+     */
+    public List<CatalogEntry> relatedTo(CatalogEntry entry) {
+        if (entry == null) {
+            return List.of();
+        }
+        List<CatalogEntry> related = new ArrayList<>();
+        for (CatalogEntry candidate : entries) {
+            if (candidate.equals(entry)) {
+                continue;
+            }
+            if (isRelated(entry, candidate)) {
+                related.add(candidate);
+            }
+        }
+        return List.copyOf(related);
+    }
+
+    /** 两个条目是否相关：同类别，或目标 id 共享显著词元。 */
+    static boolean isRelated(CatalogEntry left, CatalogEntry right) {
+        if (left.category() != null && left.category().equals(right.category())) {
+            return true;
+        }
+        Set<String> shared = targetTokens(left.target());
+        shared.retainAll(targetTokens(right.target()));
+        return !shared.isEmpty();
+    }
+
+    /**
+     * 目标 id 的<b>显著词元</b>：去掉命名空间后按 {@code _} 切分，保留长度 ≥ 3 且非通用词
+     * （{@code large} / {@code small} / {@code multiblock} / {@code multi} / {@code primitive} /
+     * {@code basic}）的词元。用于派生「同一机器族」关系（如 {@code pyrolyse_oven} 与
+     * {@code coke_oven} 共享 {@code oven}）。确定性、可测。
+     */
+    static Set<String> targetTokens(String target) {
+        Set<String> tokens = new HashSet<>();
+        if (target == null || target.isBlank()) {
+            return tokens;
+        }
+        String path = target;
+        int colon = path.indexOf(':');
+        if (colon >= 0) {
+            path = path.substring(colon + 1);
+        }
+        for (String token : path.toLowerCase(Locale.ROOT).split("_")) {
+            if (token.length() >= 3 && !GENERIC_TOKENS.contains(token)) {
+                tokens.add(token);
+            }
+        }
+        return tokens;
     }
 
     public int total() {

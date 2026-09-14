@@ -420,6 +420,44 @@ public final class GtStructureGameTests {
         helper.succeed();
     }
 
+    /**
+     * 内容工单 #10：发电·能量网 / 物流管网两类内容的<b>真实 GT 目标</b>均可经适配器解析为结构源，
+     * 且自动生成器为其产出「可播放」（每个元素都解析到方块）且「确定性」（两次生成字节相等）的结构场景。
+     * 这是两类目标可被快捷键 / JEI-EMI / GT GUI 覆盖层 / 目录解析（都经适配器）的真实数据证据。
+     */
+    @GameTest(template = "empty")
+    public static void systemContentTargetsResolveAndAutoGenerate(GameTestHelper helper) {
+        List<String> targets = List.of(
+                "gtceu:large_combustion_engine",
+                "gtceu:active_transformer",
+                "gtceu:steel_multiblock_tank",
+                "gtceu:primitive_pump");
+        for (String id : targets) {
+            StructureSource source = GtStructureAdapter.byId(id).orElse(null);
+            if (source == null) {
+                helper.fail(id + " did not resolve to a structure source (entry points would 404)");
+                return;
+            }
+            helper.assertTrue(source.blockCount() > 0, id + " produced an empty structure");
+            helper.assertTrue(source.hasController(),
+                    id + " exposes no controller cell (the bundled scene anchors on it)");
+
+            SceneData scene = SceneGenerator.generate(source);
+            helper.assertTrue(scene.source() == Source.AUTO, id + " generated scene is not source=auto");
+            helper.assertTrue(!scene.steps().isEmpty(), id + " generated no steps");
+            helper.assertTrue(
+                    SceneDataWriter.toJson(scene).equals(SceneDataWriter.toJson(SceneGenerator.generate(source))),
+                    id + " auto generation is not deterministic");
+
+            SceneElementResolver resolver = new SceneElementResolver(source);
+            for (SceneElement element : scene.elements()) {
+                helper.assertTrue(!resolver.resolve(element).isEmpty(),
+                        id + " auto scene element '" + element.id() + "' resolves to nothing");
+            }
+        }
+        helper.succeed();
+    }
+
     /** 取焦炉定义用于承载控制器方块（其方块是带 MultiblockMachineDefinition 的 MetaMachineBlock）。 */
     private static MultiblockMachineDefinition controllerDefinition() {
         MachineDefinition definition = GTRegistries.MACHINES.get(ResourceLocation.tryParse("gtceu:coke_oven"));

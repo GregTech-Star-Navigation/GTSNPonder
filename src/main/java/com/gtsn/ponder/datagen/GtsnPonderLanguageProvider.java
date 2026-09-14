@@ -2,6 +2,7 @@ package com.gtsn.ponder.datagen;
 
 import com.gtsn.ponder.catalog.CatalogKeys;
 import com.gtsn.ponder.catalog.SceneCategories;
+import com.gtsn.ponder.content.SystemSceneKeys;
 import com.gtsn.ponder.editor.EditorKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
@@ -101,6 +102,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.message.dump_failed", "Could not write the generated scene: %s");
         editorKeys(keys, false);
         catalogKeys(keys, false);
+        systemSceneKeys(keys, false);
         return keys;
     }
 
@@ -151,6 +153,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.message.dump_failed", "写入生成场景失败：%s");
         editorKeys(keys, true);
         catalogKeys(keys, true);
+        systemSceneKeys(keys, true);
         return keys;
     }
 
@@ -170,6 +173,8 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
             keys.put(CatalogKeys.PROGRESS, "已看 %s / %s");
             keys.put(CatalogKeys.EMPTY, "没有匹配的思索场景。");
             keys.put(CatalogKeys.CLOSE, "关闭");
+            keys.put(CatalogKeys.RELATED, "相关机器");
+            keys.put(CatalogKeys.RELATED_TO, "与 %s 相关");
             keys.put(CatalogKeys.XEI_OPEN, "打开这台机器的思索教程");
             keys.put(CatalogKeys.XEI_OPEN_SHORT, "思索");
             keys.put(CatalogKeys.GT_MACHINE_OPEN, "打开这台机器的思索教程");
@@ -191,6 +196,8 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(CatalogKeys.PROGRESS, "Watched %s / %s");
         keys.put(CatalogKeys.EMPTY, "No ponder scene matches this filter.");
         keys.put(CatalogKeys.CLOSE, "Close");
+        keys.put(CatalogKeys.RELATED, "Related");
+        keys.put(CatalogKeys.RELATED_TO, "Related to %s");
         keys.put(CatalogKeys.XEI_OPEN, "Open this machine's ponder tutorial");
         keys.put(CatalogKeys.XEI_OPEN_SHORT, "Ponder");
         keys.put(CatalogKeys.GT_MACHINE_OPEN, "Open this machine's ponder tutorial");
@@ -201,6 +208,84 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(CatalogKeys.categoryKey(SceneCategories.POWER), "Power & energy");
         keys.put(CatalogKeys.categoryKey(SceneCategories.LOGISTICS), "Logistics & pipes");
         keys.put(CatalogKeys.categoryKey(SceneCategories.MACHINES), "Machines");
+    }
+
+    /**
+     * 内容工单 #10（发电·能量网 / 物流管网）的随包场景文案键（中英双语）：机器特定标题 / 开场旁白，
+     * 以及概念旁白（电压等级 / 超压 / 线缆熔断；物品 / 流体管道 / 线缆 / 覆盖板）。键集中定义在
+     * {@link SystemSceneKeys}。
+     */
+    private static void systemSceneKeys(Map<String, String> keys, boolean chinese) {
+        if (chinese) {
+            keys.put(SystemSceneKeys.POWER_COMBUSTION_TITLE, "发电网：大型燃烧引擎");
+            keys.put(SystemSceneKeys.POWER_TRANSFORMER_TITLE, "发电网：有源变压器");
+            keys.put(SystemSceneKeys.POWER_COMBUSTION_INTRO,
+                    "这是 %s——一台燃烧燃料发电的引擎，为电网产出 EU。");
+            keys.put(SystemSceneKeys.POWER_TRANSFORMER_INTRO,
+                    "这是 %s——它在不同电压等级之间变换能量，让机器接到正确的电网上。");
+            keys.put(SystemSceneKeys.POWER_CONTROLLER,
+                    "控制器位于正面中央：通入正确电压后多方块成型。");
+            keys.put(SystemSceneKeys.POWER_VOLTAGE,
+                    "格雷科技的电按电压等级划分（ULV、LV、MV、HV……）。机器只接受自己那一级，变压器负责在等级之间转换。");
+            keys.put(SystemSceneKeys.POWER_OVERVOLTAGE,
+                    "超压：给机器通入高于它支持的电压，能耗变为 4 倍，并可能损坏甚至炸毁机器。");
+            keys.put(SystemSceneKeys.POWER_BURNING,
+                    "线缆熔断：线缆承载的电流超过线径允许值时会被烧断——按安培数选择 1x / 2x / 4x 线缆。");
+            keys.put(SystemSceneKeys.LOGISTICS_TANK_TITLE, "物流管网：钢制多方块储罐");
+            keys.put(SystemSceneKeys.LOGISTICS_PUMP_TITLE, "物流管网：原始水泵");
+            keys.put(SystemSceneKeys.LOGISTICS_TANK_INTRO,
+                    "这是 %s——一台流体储存多方块，是物流管网中流体侧的枢纽。");
+            keys.put(SystemSceneKeys.LOGISTICS_PUMP_INTRO,
+                    "这是 %s——它把世界中的流体泵入管道与储罐。");
+            keys.put(SystemSceneKeys.LOGISTICS_CONTROLLER,
+                    "控制器让结构成为可用的机器，之后管网才能接入并工作。");
+            keys.put(SystemSceneKeys.LOGISTICS_ITEM_PIPES,
+                    "物品管道在容器之间搬运物品：用传送带模块从源头抽取，再送往目的地。");
+            keys.put(SystemSceneKeys.LOGISTICS_FLUID_PIPES,
+                    "流体管道搬运流体；大口径管道吞吐更高，泵覆盖板 / 阀门负责进出。");
+            keys.put(SystemSceneKeys.LOGISTICS_CABLES,
+                    "线缆在发电机、变压器与机器之间输送 EU——按电压与安培数选用合适的线缆。");
+            keys.put(SystemSceneKeys.LOGISTICS_COVERS,
+                    "覆盖板可装在机器与管道上：传送带（物品）、泵（流体）、机器控制器（自动进出）等。");
+            return;
+        }
+        keys.put(SystemSceneKeys.POWER_COMBUSTION_TITLE, "Power grid: Large Combustion Engine");
+        keys.put(SystemSceneKeys.POWER_TRANSFORMER_TITLE, "Power grid: Active Transformer");
+        keys.put(SystemSceneKeys.POWER_COMBUSTION_INTRO,
+                "This is %s - a generator that burns fuel to produce EU for the power grid.");
+        keys.put(SystemSceneKeys.POWER_TRANSFORMER_INTRO,
+                "This is %s - it steps energy between voltage tiers so machines join the right grid.");
+        keys.put(SystemSceneKeys.POWER_CONTROLLER,
+                "The controller is the front-center block: supply the correct voltage to form the structure.");
+        keys.put(SystemSceneKeys.POWER_VOLTAGE,
+                "GT power comes in voltage tiers (ULV, LV, MV, HV...). A machine only accepts its own tier; "
+                        + "a transformer converts between tiers.");
+        keys.put(SystemSceneKeys.POWER_OVERVOLTAGE,
+                "Overvoltage: feeding a machine a tier above its rating quadruples its energy cost and can "
+                        + "damage or destroy it.");
+        keys.put(SystemSceneKeys.POWER_BURNING,
+                "Cable burning: a cable carrying more current than its gauge allows burns out - size the "
+                        + "cable (1x / 2x / 4x...) to the amperage.");
+        keys.put(SystemSceneKeys.LOGISTICS_TANK_TITLE, "Logistics: Steel Multiblock Tank");
+        keys.put(SystemSceneKeys.LOGISTICS_PUMP_TITLE, "Logistics: Primitive Pump");
+        keys.put(SystemSceneKeys.LOGISTICS_TANK_INTRO,
+                "This is %s - a fluid storage multiblock; it anchors the fluid side of your logistics network.");
+        keys.put(SystemSceneKeys.LOGISTICS_PUMP_INTRO,
+                "This is %s - it pumps fluids out of the world into pipes and tanks.");
+        keys.put(SystemSceneKeys.LOGISTICS_CONTROLLER,
+                "The controller turns the structure into a working machine; only then can the network connect.");
+        keys.put(SystemSceneKeys.LOGISTICS_ITEM_PIPES,
+                "Item pipes move items between inventories: use a conveyor module to extract from a source "
+                        + "and route to the destination.");
+        keys.put(SystemSceneKeys.LOGISTICS_FLUID_PIPES,
+                "Fluid pipes move fluids; larger pipes have higher throughput, and a pump cover or valve "
+                        + "lets fluid in or out.");
+        keys.put(SystemSceneKeys.LOGISTICS_CABLES,
+                "Cables carry EU between generators, transformers and machines - pick a cable for the "
+                        + "voltage and amperage you need.");
+        keys.put(SystemSceneKeys.LOGISTICS_COVERS,
+                "Covers mount on machines and pipes: conveyor (items), pump (fluids), machine controller "
+                        + "(auto I/O) and more.");
     }
 
     /**

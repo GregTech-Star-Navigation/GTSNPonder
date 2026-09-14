@@ -3,6 +3,7 @@ package com.gtsn.ponder.datagen;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.gtsn.ponder.content.SystemSceneKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -90,6 +92,24 @@ class GeneratedLangKeysTest {
             for (String key : GT_MACHINE_OVERLAY_KEYS) {
                 assertTrue(locale.getValue().has(key),
                         locale.getKey() + " is missing GT machine overlay key " + key);
+                assertFalse(locale.getValue().get(key).getAsString().isBlank(), key);
+            }
+        }
+    }
+
+    /**
+     * 内容工单 #10 的随包系统场景（发电 / 物流）标题 / 开场 / 概念文案，以及目录「相关机器」导航键，
+     * 必须经 datagen 产出中英双语且非空白——防止「加了场景却忘了重跑 runData」。
+     */
+    @Test
+    void bothLocalesCoverSystemSceneAndRelatedNavigationKeys() throws IOException {
+        List<String> keys = new ArrayList<>(SystemSceneKeys.ALL);
+        keys.add(com.gtsn.ponder.catalog.CatalogKeys.RELATED);
+        keys.add(com.gtsn.ponder.catalog.CatalogKeys.RELATED_TO);
+        for (Map.Entry<String, JsonObject> locale : Map.of("en_us", read(EN, "en_us"), "zh_cn", read(ZH, "zh_cn"))
+                .entrySet()) {
+            for (String key : keys) {
+                assertTrue(locale.getValue().has(key), locale.getKey() + " is missing system scene key " + key);
                 assertFalse(locale.getValue().get(key).getAsString().isBlank(), key);
             }
         }
