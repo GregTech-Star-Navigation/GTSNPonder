@@ -22,8 +22,11 @@
   "ponder.gtsnponder.generated.narration.hatches.none": "该结构未声明仓口或总线。",
   "ponder.gtsnponder.generated.narration.modules": "%s 个模块位——在此安装匹配的模块。",
   "ponder.gtsnponder.generated.narration.modules.none": "该结构未声明模块位。",
-  "ponder.gtsnponder.generated.narration.legend": "图例：金色边框 = 控制器，蓝色边框 = 仓口 / 总线。",
-  "ponder.gtsnponder.generated.narration.formed": "先隐藏再重现，即未成型到成型。金色 = 控制器，蓝色 = 仓口 / 总线。",
+  "ponder.gtsnponder.generated.narration.formed": "%s（%s）成型演示：本机 %s 个仓口 / 总线（%s）、%s 个模块位。先隐藏再重现，即未成型 → 成型。",
+
+  "ponder.gtsnponder.legend.title": "图例",
+  "ponder.gtsnponder.legend.controller": "控制器（金色）",
+  "ponder.gtsnponder.legend.hatch": "仓口 / 总线（蓝色）",
 
   "ponder.gtsnponder.message.no_target": "视线内没有格雷科技机器 / 多方块（需在触及范围内）。",
   "ponder.gtsnponder.message.no_scene": "%s 暂无思索场景。",

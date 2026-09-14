@@ -5,6 +5,7 @@ import com.gtsn.lib.ui.render.GuiGraphicsRenderContext;
 import com.gtsn.lib.ui.render.RenderContext;
 import com.gtsn.ponder.structure.StructureBlock;
 import com.gtsn.ponder.structure.StructureSource;
+import com.gtsn.ponder.viewport.CameraFraming;
 import com.gtsn.ponder.viewport.SceneViewport;
 import com.gtsn.ponder.viewport.ViewportController;
 import com.gtsn.ponder.viewport.ViewportRenderer;
@@ -52,27 +53,39 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
 
     private final StructureSource structure;
     private final SceneWidget sceneWidget;
+    /**
+     * 承载结构方块的假世界（{@link TrackedDummyWorld}，<b>无 proxy 世界</b>）。必须保持强引用，
+     * 因为 {@code SceneWidget} 内部假世界仅以 {@link java.lang.ref.WeakReference} 指向它。
+     */
+    private final TrackedDummyWorld dummyWorld;
     private final ViewportController controller = new ViewportController();
     /** 结构包围盒中心（首次 {@code setRenderedCore} 后捕获），分段显隐时保持取景不漂移。 */
     private final Vector3f fixedCenter;
+    /** 实际视线中心：包围盒中心 + 取景居中的偏移（未启用自适应时等于 {@link #fixedCenter}）。 */
+    private Vector3f framingCenter;
 
     private Rect bounds = Rect.ZERO;
     private float partialTick;
+    /** 取景自适应目标填充比例；{@code <= 0} 表示按场景给的距离（不做自适应）。 */
+    private double fitMargin;
     private int appliedX = Integer.MIN_VALUE;
     private int appliedY = Integer.MIN_VALUE;
     private int appliedWidth = Integer.MIN_VALUE;
     private int appliedHeight = Integer.MIN_VALUE;
 
-    private LdlibSceneViewport(StructureSource structure, SceneWidget sceneWidget) {
+    private LdlibSceneViewport(StructureSource structure, SceneWidget sceneWidget, TrackedDummyWorld dummyWorld) {
         this.structure = structure;
         this.sceneWidget = sceneWidget;
+        this.dummyWorld = dummyWorld;
         Vector3f center = sceneWidget.getCenter();
         this.fixedCenter = center == null ? new Vector3f(0.0f, 0.0f, 0.0f) : new Vector3f(center);
+        this.framingCenter = new Vector3f(fixedCenter);
         applyCamera();
     }
 
     /**
-     * 在给定客户端世界（作为 LDO 虚世界的 biome / tint 代理）上创建视口，并载入结构。
+     * 创建视口并载入结构。结构方块放入一个<b>无 proxy 世界</b>的假世界（其 {@code getBlockState}
+     * 返回结构方块而非玩家世界方块）；{@code proxyLevel} 仅用于校验「必须在世界内打开」。
      *
      * @param proxyLevel 客户端世界（{@code Minecraft.getInstance().level}）；不得为空
      * @param structure  要渲染的结构（由 GT 适配器产出）
@@ -81,11 +94,19 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
         if (proxyLevel == null) {
             throw new IllegalArgumentException("proxyLevel must not be null (open the viewport in a world)");
         }
-        SceneWidget widget = new SceneWidget(0, 0, 1, 1, proxyLevel);
+        // 关键：用一个「无 proxy 世界」的假世界承接结构方块。TrackedDummyWorld#getBlockState 在有 proxy
+        // 世界时返回 proxy 的方块状态；若把真实客户端世界当 proxy（旧实现），预览会渲染玩家世界里同坐标
+        // 的方块（表现为一块通用灰色石头 / 水面），而非目标结构。GT 自身的多方块预览同样以假世界作 proxy。
+        TrackedDummyWorld dummy = new TrackedDummyWorld();
+        Map<BlockPos, BlockInfo> blocks = resolveBlocks(structure);
+        if (!blocks.isEmpty()) {
+            dummy.addBlocks(blocks);
+        }
+        SceneWidget widget = new SceneWidget(0, 0, 1, 1, dummy);
         widget.setClientSideWidget();
         if (widget.getRenderer() == null) {
             // 控件未挂在 ModularUI 上时 isRemote() 可能为 false，显式建场景更确定。
-            widget.createScene(proxyLevel);
+            widget.createScene(dummy);
         }
         widget.setClearColor(0xFF101418);
         widget.setRenderFacing(false);
@@ -95,13 +116,10 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
         widget.setIntractable(true);
         widget.setHoverTips(false);
 
-        TrackedDummyWorld dummy = widget.getDummyWorld();
-        Map<BlockPos, BlockInfo> blocks = resolveBlocks(structure);
-        if (dummy != null && !blocks.isEmpty()) {
-            dummy.addBlocks(blocks);
+        if (!blocks.isEmpty()) {
             widget.setRenderedCore(blocks.keySet());
         }
-        return new LdlibSceneViewport(structure, widget);
+        return new LdlibSceneViewport(structure, widget, dummy);
     }
 
     /** 把 DTO 的方块 id 解析为实际方块状态（缺资源 / 空气跳过）。 */
@@ -126,10 +144,9 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
         return structure;
     }
 
-    /** 已渲染进虚世界的方块数量（自动测试用）。 */
+    /** 已载入假世界的方块数量（自动测试用）。 */
     public int renderedBlockCount() {
-        TrackedDummyWorld dummy = sceneWidget.getDummyWorld();
-        return dummy == null ? 0 : dummy.getRenderedBlocks().size();
+        return dummyWorld == null ? 0 : dummyWorld.getRenderedBlocks().size();
     }
 
     /** LDLib 侧实际生效的缩放（证明相机状态确实写入了渲染器）。 */
@@ -150,6 +167,8 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
     @Override
     public void setBounds(Rect bounds) {
         this.bounds = bounds;
+        // resize / 首次布局后：若场景请求了取景自适应，按新的视口纵横比重新反算距离。
+        refitCamera();
     }
 
     @Override
@@ -226,9 +245,13 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
         applyCamera();
     }
 
-    /** 底层 LDLib 虚世界（世界桥据此增删 / 替换方块）。 */
+    /**
+     * 世界桥（{@link DummySceneWorld}）据此增删 / 替换方块的假世界。返回<b>承载结构的那个假世界</b>
+     * （无 proxy 世界），而非 {@code SceneWidget} 内部的 delegate 世界——后者仅把
+     * {@code getBlockState} 转发到本世界。
+     */
     public TrackedDummyWorld dummyWorld() {
-        return sceneWidget.getDummyWorld();
+        return dummyWorld;
     }
 
     /**
@@ -238,7 +261,7 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
      */
     public void setVisibleBlocks(Collection<BlockPos> positions) {
         sceneWidget.setRenderedCore(positions);
-        sceneWidget.setCenter(fixedCenter);
+        sceneWidget.setCenter(framingCenter);
         applyCamera();
     }
 
@@ -246,6 +269,51 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
     public void applySceneCamera(double yaw, double pitch, double zoom) {
         controller.set(yaw, pitch, zoom);
         applyCamera();
+    }
+
+    /**
+     * 应用「取景自适应」相机：设定角度后按结构包围盒 + 当前视口纵横比反算恰好容纳结构的距离
+     * （{@link CameraFraming}）。{@code margin} 为目标填充比例（{@code <= 0} 退回普通距离）。
+     * 视口尚未布局（{@code bounds} 为零）时仅记录目标，待 {@link #setBounds} 触发重算。
+     */
+    public void applySceneCameraFit(double yaw, double pitch, double margin) {
+        this.fitMargin = margin;
+        controller.set(yaw, pitch, controller.zoom());
+        refitCamera();
+    }
+
+    /** 当前是否处于取景自适应模式。 */
+    public boolean isFramingFit() {
+        return fitMargin > 0.0d;
+    }
+
+    /** 当前取景自适应目标填充比例（{@code 0} 表示未启用）。 */
+    public double framingMargin() {
+        return fitMargin;
+    }
+
+    /** 按结构包围盒 + 视口纵横比反算相机距离并应用；未启用自适应 / 视口未就绪时为空操作。 */
+    private void refitCamera() {
+        if (fitMargin <= 0.0d) {
+            return;
+        }
+        Rect current = bounds;
+        if (current.width() <= 0 || current.height() <= 0) {
+            return;
+        }
+        CameraFraming.Fit fit = CameraFraming.fit(
+                structure.sizeX(), structure.sizeY(), structure.sizeZ(),
+                controller.rotationYaw(), controller.rotationPitch(),
+                current.width(), current.height(), CameraFraming.DEFAULT_FOV_Y_DEGREES, fitMargin);
+        if (fit.isValid()) {
+            framingCenter = new Vector3f(
+                    fixedCenter.x + (float) fit.centerOffsetX(),
+                    fixedCenter.y + (float) fit.centerOffsetY(),
+                    fixedCenter.z + (float) fit.centerOffsetZ());
+            sceneWidget.setCenter(framingCenter);
+            controller.set(controller.rotationYaw(), controller.rotationPitch(), fit.distance());
+            applyCamera();
+        }
     }
 
     /** 场景内高亮 / 轮廓绘制所需的底层控件（世界桥在 {@code afterWorldRender} 钩子中画边框）。 */

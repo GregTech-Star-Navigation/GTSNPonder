@@ -66,8 +66,10 @@ import java.util.Set;
  */
 public final class DummySceneWorld implements SceneWorld {
 
-    private static final int HIGHLIGHT_COLOR = 0xFFFFC000;
-    private static final int OUTLINE_COLOR = 0xFF40C0FF;
+    /** 控制器高亮色（金）——与播放屏常驻图例共用。 */
+    public static final int HIGHLIGHT_COLOR = 0xFFFFC000;
+    /** 仓口 / 总线轮廓色（蓝）——与播放屏常驻图例共用。 */
+    public static final int OUTLINE_COLOR = 0xFF40C0FF;
 
     private final StructureSource structure;
     private final SceneData scene;
@@ -215,10 +217,16 @@ public final class DummySceneWorld implements SceneWorld {
     @Override
     public void setCamera(CameraState camera) {
         this.camera = camera;
-        if (camera != null) {
-            double zoom = camera.distance() > 0.0d ? camera.distance() : ViewportController.DEFAULT_ZOOM;
-            viewport.applySceneCamera(camera.yaw(), camera.pitch(), zoom);
+        if (camera == null) {
+            return;
         }
+        if (camera.fits()) {
+            // 取景自适应：视口按包围盒 + 纵横比反算距离，使结构占满视口（自动生成场景）。
+            viewport.applySceneCameraFit(camera.yaw(), camera.pitch(), camera.fitMargin());
+            return;
+        }
+        double zoom = camera.distance() > 0.0d ? camera.distance() : ViewportController.DEFAULT_ZOOM;
+        viewport.applySceneCamera(camera.yaw(), camera.pitch(), zoom);
     }
 
     @Override
@@ -315,11 +323,15 @@ public final class DummySceneWorld implements SceneWorld {
                 }
             }
         }
-        // 仓口 / 总线轮廓：单面（顶面）蓝色细边框，数量由生成器收敛（≤ HATCH_OUTLINE_LIMIT）。
+        // 仓口 / 总线轮廓：6 面蓝色细线框（inner=1 更细），从任意相机角度都可读；数量由生成器收敛
+        // （≤ HATCH_OUTLINE_LIMIT）并均匀抽样以减少重叠。drawFacingBorder 关闭深度测试，故远侧仓口
+        // 的轮廓也不会被结构遮挡。
         if (!outlinedPositions.isEmpty()) {
             PoseStack poseStack = new PoseStack();
             for (BlockPos pos : outlinedPositions) {
-                widget.drawFacingBorder(poseStack, new BlockPosFace(pos, Direction.UP), OUTLINE_COLOR, 1);
+                for (Direction face : Direction.values()) {
+                    widget.drawFacingBorder(poseStack, new BlockPosFace(pos, face), OUTLINE_COLOR, 1);
+                }
             }
         }
     }

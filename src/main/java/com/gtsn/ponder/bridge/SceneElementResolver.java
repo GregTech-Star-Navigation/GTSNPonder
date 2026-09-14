@@ -27,7 +27,9 @@ import java.util.Objects;
  *   <li>{@code block}：{@code params.block} 指定的方块注册名（缺参数时为空）；</li>
  *   <li>{@code layer}：{@code params.y} 指定的结构局部 Y 层（缺参数时为空）；</li>
  *   <li>{@code role}：{@code params.role} 指定的 {@link StructureRole} 名（大小写不敏感；缺参数 / 未知角色时为空）。
- *       可选 {@code params.limit}（正整数）把结果截断为确定性前 N 个单元，用于收敛高亮轮廓数量。</li>
+ *       可选 {@code params.limit}（正整数）把结果截断为确定性前 N 个单元，用于收敛高亮轮廓数量；
+ *       可选 {@code params.spread}（布尔）在 {@code limit} 生效时改为在该角色全部单元里<b>均匀抽样</b>
+ *       （而非取前 N 个），避免代表位置彼此相邻导致轮廓重叠。两者均为确定性选择。</li>
  * </ul>
  *
  * <p>纯 Java：不依赖 Minecraft 或格雷科技，可 headless 单测（导演核心纪律的延伸）。</p>
@@ -68,7 +70,8 @@ public final class SceneElementResolver {
             case SELECTOR_LAYER -> resolveLayer(SceneParams.number(element.params(), "y", Double.NaN));
             case SELECTOR_ROLE -> resolveRole(
                     SceneParams.string(element.params(), "role", null),
-                    SceneParams.number(element.params(), "limit", 0.0d));
+                    SceneParams.number(element.params(), "limit", 0.0d),
+                    SceneParams.bool(element.params(), "spread", false));
             default -> List.of();
         };
     }
@@ -124,7 +127,7 @@ public final class SceneElementResolver {
         return List.copyOf(matches);
     }
 
-    private List<StructureBlock> resolveRole(String roleName, double rawLimit) {
+    private List<StructureBlock> resolveRole(String roleName, double rawLimit, boolean spread) {
         if (roleName == null || roleName.isBlank()) {
             return List.of();
         }
@@ -134,16 +137,28 @@ public final class SceneElementResolver {
         } catch (IllegalArgumentException unknownRole) {
             return List.of();
         }
-        int limit = rawLimit > 0.0d && rawLimit == Math.rint(rawLimit) ? (int) rawLimit : 0;
         List<StructureBlock> matches = new ArrayList<>();
         for (StructureBlock block : structure.blocks()) {
             if (block.role() == role) {
                 matches.add(block);
-                if (limit > 0 && matches.size() >= limit) {
-                    break;
-                }
             }
         }
-        return List.copyOf(matches);
+        if (matches.isEmpty()) {
+            return List.of();
+        }
+        int limit = rawLimit > 0.0d && rawLimit == Math.rint(rawLimit) ? (int) rawLimit : 0;
+        if (limit <= 0 || limit >= matches.size()) {
+            return List.copyOf(matches);
+        }
+        if (!spread || limit == 1) {
+            return List.copyOf(matches.subList(0, limit));
+        }
+        // 均匀抽样：在 [0, size-1] 上取 limit 个等距下标（含首尾），确定性且覆盖整个角色分布。
+        List<StructureBlock> selected = new ArrayList<>(limit);
+        for (int i = 0; i < limit; i++) {
+            int index = (int) Math.round((double) i * (matches.size() - 1) / (limit - 1));
+            selected.add(matches.get(index));
+        }
+        return List.copyOf(selected);
     }
 }

@@ -52,9 +52,14 @@ GTSNPonder 的全部二维界面基于 GTSNLib 自研 UI 框架（ADR-0004），
   窗口 resize（视口 608×328 → 448×238 且新矩形输入仍转发）；抓图
   `run/screenshots/gtsnponder-viewport.png` 后自动退出。
 
-## 已知观察（非阻塞）
+## 已知观察
 
-- 虚世界渲染的方块偏蓝着色（dummy world 的天光 / 光源色），并非缺失模型（无紫黑棋盘格）。
-  属预览观感问题，后续世界桥工单可调整光源 / 光照。
+- **已修复（#7 round-3）**：早期观察到的「方块偏蓝着色 / 通用灰石」并非光照问题，而是
+  `SceneWidget` 内部 `TrackedDummyWorld` 以**真实客户端世界**为 proxy 时，`getBlockState` 返回玩家世界
+  同坐标方块（`TrackedDummyWorld#getBlockState`：`proxyWorld != null ? proxyWorld.getBlockState(pos)
+: renderedBlocks...`）。修复：结构方块放入**无 proxy 世界**的 `TrackedDummyWorld` 再交给
+  `SceneWidget`（与 GT 自带多方块预览同一手法），预览即渲染目标结构及其真实机壳材质
+  （焦炉砖棕、装配线机壳灰、洁净室 plascrete 浅灰）。依据：`run/screenshots/gtsnponder-autogen-*.png`
+  与 `autogen` 日志的材质直方图（如 `{gtceu:coke_oven_bricks=25}`、`{gtceu:plascrete=75}`）。
 - 本 spike 只渲染结构页本身，不触发 GT 的「成型（formed）」状态与模块合并；后者属自动生成 /
   模块演示工单。

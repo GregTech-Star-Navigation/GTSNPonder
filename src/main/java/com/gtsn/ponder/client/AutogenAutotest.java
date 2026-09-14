@@ -3,9 +3,11 @@ package com.gtsn.ponder.client;
 import com.gtsn.ponder.GTSNPonder;
 import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.SceneDataWriter;
+import com.gtsn.ponder.engine.model.SceneStep;
 import com.gtsn.ponder.engine.model.Source;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.gt.GtStructureAdapter;
+import com.gtsn.ponder.structure.StructureBlock;
 import com.gtsn.ponder.structure.StructureSource;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.logging.LogUtils;
@@ -32,6 +34,8 @@ import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * 自动生成场景的客户端自动测试（开发专用、无人值守证据）：环境变量
@@ -71,10 +75,10 @@ public final class AutogenAutotest {
     private static final int CAPTURE_SETTLE_TICKS = 20;
 
     /**
-     * 「揭示中」抓图时刻占总时长的比例：落在搭建开始后不久，此时旁白仍是机器特定的开场文案
-     * （机器名 / 标识 / 尺寸），且已渲染出部分结构。
+     * 「揭示」抓图时刻：等所有 {@code build.*} 分段都已显示（结构完全呈现、尚未进入成型演示）时抓图，
+     * 使相机取景（按完整包围盒自适应）与成型图一致地填满视口；此时旁白仍是机器特定文案。
      */
-    private static final double REVEAL_FRACTION = 0.18d;
+    private static final int REVEAL_SETTLE_TICKS = 4;
 
     /** 小 / 中候选：按顺序取第一个真实存在者。 */
     private static final List<String> SMALL_CANDIDATES = List.of(
@@ -201,10 +205,10 @@ public final class AutogenAutotest {
         ticks = 0;
     }
 
-    /** 揭示中途抓一张（展示搭建进行时）。 */
+    /** 结构完全揭示（所有 build 分段可见）后抓一张（展示搭建完成的未成型形态）。 */
     private static void tickReveal(Minecraft minecraft) {
         ScenePlayerScreen screen = (ScenePlayerScreen) minecraft.screen;
-        double target = screen.playback().totalTime() * REVEAL_FRACTION;
+        double target = buildCompleteTime(screen);
         if (screen.playback().time() < target || screen.bridge().visibleBlockCount() <= 0) {
             if (ticks > STAGE_TIMEOUT_TICKS) {
                 fail(minecraft, "reveal never became capturable (t=" + screen.playback().time()
@@ -212,9 +216,27 @@ public final class AutogenAutotest {
             }
             return;
         }
+        if (ticks < REVEAL_SETTLE_TICKS) {
+            return;
+        }
         capture(minecraft, "reveal");
         stage = Stage.REVEAL_GRAB;
         ticks = 0;
+    }
+
+    /**
+     * 结构完全揭示的时刻 = 最后一个 {@code build.*} 分段的起始时刻（该分段随即生效，结构完整可见，
+     * 且尚未进入控制器 / 仓口高亮步骤——与「成型」截图（高亮 + 成型脉冲后）明显区分）。
+     */
+    private static double buildCompleteTime(ScenePlayerScreen screen) {
+        List<SceneStep> steps = screen.scene().steps();
+        int lastBuild = -1;
+        for (int i = 0; i < steps.size(); i++) {
+            if (steps.get(i).id().startsWith("build.")) {
+                lastBuild = i;
+            }
+        }
+        return lastBuild < 0 ? 0.0d : screen.playback().stepStartTime(lastBuild);
     }
 
     private static void tickRevealGrab(Minecraft minecraft) {
@@ -267,9 +289,15 @@ public final class AutogenAutotest {
         ScenePlayerScreen screen = (ScenePlayerScreen) minecraft.screen;
         TargetScene target = targets.get(index);
         String name = screenshotName(index, target.target(), phase);
-        LOGGER.info("[GTSNPonder] autogen autotest: {} t={} step={} visibleBlocks={} narration='{}' -> {}",
+        var viewport = screen.viewportBounds();
+        LOGGER.info("[GTSNPonder] autogen autotest: {} t={} step={} visibleBlocks={} narration='{}'",
                 phase, screen.playback().time(), screen.playback().stepIndex(),
-                screen.bridge().visibleBlockCount(), screen.narrationText().text(), name);
+                screen.bridge().visibleBlockCount(), screen.narrationText().text());
+        LOGGER.info("[GTSNPonder] autogen autotest: {} framing margin={} zoom={} viewport={}x{} "
+                        + "(structure {}x{}x{}) -> {}",
+                phase, screen.viewport().framingMargin(), screen.viewport().cameraZoom(),
+                viewport.width(), viewport.height(),
+                target.source().sizeX(), target.source().sizeY(), target.source().sizeZ(), name);
         grabScreenshot(minecraft, name);
     }
 
@@ -301,6 +329,7 @@ public final class AutogenAutotest {
                 LOGGER.info("[GTSNPonder] autogen autotest: {} tier -> {} ({} blocks, mode={})",
                         tier, candidate, source.get().blockCount(),
                         roleGrouped ? "role-grouped/LOD" : "layer-by-layer");
+                logMaterials(tier, source.get());
                 return;
             }
         }
@@ -324,6 +353,20 @@ public final class AutogenAutotest {
         LOGGER.info("[GTSNPonder] autogen autotest: {} tier -> {} ({} blocks, mode={})",
                 tier, best.target(), best.source().blockCount(),
                 best.roleGrouped() ? "role-grouped/LOD" : "layer-by-layer");
+        logMaterials(tier, best.source());
+    }
+
+    /**
+     * 记录结构的方块材质直方图：人工评审可据此核对预览是否使用了各机器<b>真实的机壳材质</b>
+     * （如焦炉砖 / 装配线机壳 / 洁净室材质），而非退化为通用灰石。
+     */
+    private static void logMaterials(String tier, StructureSource source) {
+        Map<String, Integer> histogram = new TreeMap<>();
+        for (StructureBlock block : source.blocks()) {
+            histogram.merge(block.blockId(), 1, Integer::sum);
+        }
+        LOGGER.info("[GTSNPonder] autogen autotest: {} materials of {} -> {}",
+                tier, source.id(), histogram);
     }
 
     /** 断言同一结构两次生成产生字节相等 JSON（确定性）。 */

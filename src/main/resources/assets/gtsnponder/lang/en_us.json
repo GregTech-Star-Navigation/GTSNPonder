@@ -22,8 +22,11 @@
   "ponder.gtsnponder.generated.narration.hatches.none": "This structure declares no hatches or buses.",
   "ponder.gtsnponder.generated.narration.modules": "%s module slot(s) - install matching modules here.",
   "ponder.gtsnponder.generated.narration.modules.none": "This structure declares no module slots.",
-  "ponder.gtsnponder.generated.narration.legend": "Legend: gold outline = controller, blue outline = hatch / bus.",
-  "ponder.gtsnponder.generated.narration.formed": "Hidden then shown again: unformed to formed. Gold = controller, blue = hatch / bus.",
+  "ponder.gtsnponder.generated.narration.formed": "%s (%s) formed demo: %s hatch/bus block(s) (%s), %s module slot(s). Hidden then shown again: unformed -> formed.",
+
+  "ponder.gtsnponder.legend.title": "Legend",
+  "ponder.gtsnponder.legend.controller": "Controller (gold)",
+  "ponder.gtsnponder.legend.hatch": "Hatch / bus (blue)",
 
   "ponder.gtsnponder.message.no_target": "No GT machine or multiblock in view (within reach).",
   "ponder.gtsnponder.message.no_scene": "No ponder scene is registered for %s.",

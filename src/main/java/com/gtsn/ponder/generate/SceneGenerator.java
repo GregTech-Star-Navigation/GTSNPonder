@@ -34,19 +34,22 @@ import java.util.TreeSet;
  * {@code > CELL_BUDGET} 即切换（恰好等于预算仍走逐层）。</p>
  *
  * <h2>自适应取景</h2>
- * <p>相机距离由结构包围盒<b>对角线</b>推导（{@code FIT_FACTOR × diagonal}，下限
- * {@link #MIN_CAMERA_DISTANCE}），使结构占据视口主要区域；相机步骤排在搭建之前，故整个揭示过程
- * 都在合适取景下呈现。视口投影的取景<b>比例</b>与视口像素尺寸无关，故同一因子在不同视口尺寸下
- * 保持一致的填充度。</p>
+ * <p>相机步骤声明 {@code fit=true} + {@code margin}（{@link #FIT_MARGIN}），由视口层按结构包围盒
+ * <b>与视口纵横比</b>反算恰好容纳结构的相机距离（见 {@code com.gtsn.ponder.viewport.CameraFraming}），
+ * 使结构占满视口（窄轴填充 ≈ {@code margin}）。相机步骤排在搭建之前，故整个揭示过程都在合适
+ * 取景下呈现；同时仍写出确定性的 {@code distance}（包围盒对角线 × {@link #FIT_FACTOR}）作为不含
+ * 视口尺寸时的回退值，保证 headless 单测 / 产物可 diff。</p>
  *
  * <h2>高亮可读性</h2>
- * <p>控制器用 {@code highlight}（视口金色边框），仓口 / 总线用 {@code outline}（视口蓝色边框），
- * 颜色区分 + 旁白图例（{@link #NARRATION_LEGEND}）。仓口按角色<b>分批</b>高亮，且总数收敛到
- * {@link #HATCH_OUTLINE_LIMIT} 个代表位置，避免大量重叠轮廓。</p>
+ * <p>控制器用 {@code highlight}（视口金色线框盒），仓口 / 总线用 {@code outline}（视口蓝色细线框
+ * 盒，6 面绘制，从任意角度可见）。颜色图例移入播放屏的<b>常驻图例区</b>（不再占用旁白句子）。
+ * 仓口按角色<b>分批</b>高亮，总数收敛到 {@link #HATCH_OUTLINE_LIMIT} 个代表位置，并在角色内
+ * <b>均匀抽样</b>（{@code spread}）避免代表位置彼此相邻导致轮廓重叠。</p>
  *
  * <h2>机器特定旁白</h2>
  * <p>旁白键携带 {@link SceneStep#narrationArgs() 模板参数}（机器名 / 标识 / 结构尺寸 / 仓口数量与
- * 角色 / 模块位数量），同一模板产出机器特定文案；中英双语键见 {@code lang/*.json}。</p>
+ * 角色 / 模块位数量），同一模板产出机器特定文案；<b>成型旁白同样机器特定</b>（标识 / 尺寸 /
+ * 仓口数量与角色 / 模块位数量）。中英双语键见 {@code lang/*.json}。</p>
  *
  * <h2>成型演示</h2>
  * <p>隐藏全部搭建分段（未成型）→ 重新显示（成型）→ 对控制器发一次成型脉冲 → 成型旁白。</p>
@@ -86,12 +89,7 @@ public final class SceneGenerator {
     public static final String NARRATION_HATCHES_NONE = "ponder.gtsnponder.generated.narration.hatches.none";
     public static final String NARRATION_MODULES = "ponder.gtsnponder.generated.narration.modules";
     public static final String NARRATION_MODULES_NONE = "ponder.gtsnponder.generated.narration.modules.none";
-    public static final String NARRATION_LEGEND = "ponder.gtsnponder.generated.narration.legend";
     public static final String NARRATION_FORMED = "ponder.gtsnponder.generated.narration.formed";
-
-    /** 旁白图例用到的颜色词：控制器金色、仓口 / 总线蓝色（与视口桥的两种边框颜色一致）。 */
-    public static final String HIGHLIGHT_COLOR_CONTROLLER = "gold";
-    public static final String HIGHLIGHT_COLOR_HATCH = "blue";
 
     private static final int INTRO_TEXT_DURATION = 45;
     private static final int LAYER_SECTION_DURATION = 12;
@@ -104,7 +102,14 @@ public final class SceneGenerator {
     private static final int FORMED_PULSE_DURATION = 20;
     private static final int FORMED_TEXT_DURATION = 40;
 
-    /** 相机取景：距离 = FIT_FACTOR × 包围盒对角线（下限 {@link #MIN_CAMERA_DISTANCE}）。 */
+    /**
+     * 取景自适应目标填充比例（视口窄轴的占比）：相机步骤写出 {@code fit=true, margin=FIT_MARGIN}，
+     * 由视口层按包围盒 + 纵横比反算。0.90 表示窄轴填充 90%（相机方向为斜 3/4，AABB 投影保守，
+     * 实际方块轮廓约 70–85%）。
+     */
+    public static final double FIT_MARGIN = 0.90d;
+
+    /** 相机取景回退：距离 = FIT_FACTOR × 包围盒对角线（下限 {@link #MIN_CAMERA_DISTANCE}）。 */
     private static final double FIT_FACTOR = 0.82d;
     private static final double MIN_CAMERA_DISTANCE = 2.0d;
     private static final double CAMERA_YAW = 25.0d;
@@ -148,7 +153,6 @@ public final class SceneGenerator {
         appendControllerHighlight(source, steps);
         appendHatchHighlight(source, elements, steps);
         appendModuleNarration(source, steps);
-        steps.add(text("text.legend", NARRATION_LEGEND, TEXT_DURATION, List.of()));
         appendFormedDemonstration(source, steps, buildSectionIds);
 
         return SceneData.builder()
@@ -171,7 +175,9 @@ public final class SceneGenerator {
                 .duration(0)
                 .param("yaw", CAMERA_YAW)
                 .param("pitch", CAMERA_PITCH)
-                .param("distance", cameraDistance(source));
+                .param("distance", cameraDistance(source))
+                .param("fit", Boolean.TRUE)
+                .param("margin", FIT_MARGIN);
         if (source.hasController()) {
             builder.addTarget(ELEMENT_CONTROLLER);
         }
@@ -248,8 +254,11 @@ public final class SceneGenerator {
                 continue;
             }
             String id = HATCH_PREFIX + role.name();
+            // spread=true：在该角色的全部单元里均匀抽样 limit 个代表位置，避免取前 N 个彼此相邻
+            // 导致的轮廓重叠（见 SceneElementResolver 的 role + spread）。
             elements.add(SceneElement.of(id, "anchor", Map.of(
-                    "selector", "role", "role", role.name(), "limit", (double) limit)));
+                    "selector", "role", "role", role.name(),
+                    "limit", (double) limit, "spread", Boolean.TRUE)));
             steps.add(SceneStep.builder()
                     .id("outline.hatch." + role.name())
                     .type(StepType.OUTLINE)
@@ -297,7 +306,13 @@ public final class SceneGenerator {
                 .duration(FORMED_PULSE_DURATION)
                 .targets(List.of(pulseTarget))
                 .build());
-        steps.add(text("formed.text", NARRATION_FORMED, FORMED_TEXT_DURATION, List.of()));
+        // 成型旁白机器特定：机器标识 / 结构尺寸 / 仓口·总线数量与角色 / 模块位数量。
+        steps.add(text("formed.text", NARRATION_FORMED, FORMED_TEXT_DURATION, List.of(
+                source.id(),
+                sizeText(source),
+                String.valueOf(source.hatches().size()),
+                rolesTextOrDash(hatchRolesPresent(source)),
+                String.valueOf(source.moduleSlotCount()))));
     }
 
     private static SceneStep text(String id, String narrationKey, int duration, List<String> args) {
@@ -395,6 +410,11 @@ public final class SceneGenerator {
             builder.append(role.name());
         }
         return builder.toString();
+    }
+
+    /** 角色列表文本；空列表返回占位符 {@code —}，使成型旁白在无仓口时也可读。 */
+    private static String rolesTextOrDash(List<StructureRole> roles) {
+        return roles.isEmpty() ? "—" : rolesText(roles);
     }
 
     private static String displayName(StructureSource source) {

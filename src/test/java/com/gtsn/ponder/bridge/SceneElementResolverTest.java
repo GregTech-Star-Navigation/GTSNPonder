@@ -151,6 +151,26 @@ class SceneElementResolverTest {
     }
 
     @Test
+    void roleSelectorSpreadSamplesEvenlyAcrossMatches() {
+        StructureSource.Builder builder = StructureSource.builder("gtceu:spread").size(6, 1, 1).controller(0, 0, 0);
+        builder.addBlock(0, 0, 0, "gtceu:test_controller", StructureRole.CONTROLLER);
+        for (int x = 1; x < 6; x++) {
+            builder.addBlock(x, 0, 0, "gtceu:input_bus", StructureRole.ITEM_INPUT);
+        }
+        SceneElementResolver resolver = new SceneElementResolver(builder.build());
+
+        List<StructureBlock> spread = resolver.resolve(SceneElement.of("hatch", "anchor",
+                Map.of("selector", "role", "role", "ITEM_INPUT", "limit", 3.0d, "spread", true)));
+        List<StructureBlock> firstN = resolver.resolve(SceneElement.of("hatch", "anchor",
+                Map.of("selector", "role", "role", "ITEM_INPUT", "limit", 3.0d)));
+
+        assertEquals(List.of(1, 3, 5), spread.stream().map(StructureBlock::x).toList(),
+                "spread must sample evenly across the whole role, including the last unit");
+        assertEquals(List.of(1, 2, 3), firstN.stream().map(StructureBlock::x).toList(),
+                "without spread the first N units are used");
+    }
+
+    @Test
     void roleSelectorWithoutRoleParamIsEmpty() {
         SceneElementResolver resolver = new SceneElementResolver(withRoles());
 

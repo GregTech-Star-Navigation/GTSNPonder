@@ -49,11 +49,16 @@ $env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成�
   生成字节相等 JSON，由 `SceneDataWriter` 序列化）。
 - 运行时接线：`/gtsnponder scene <target>` 无手作场景时按需自动生成；`/gtsnponder generate <target>`
   强制生成并播放；`/gtsnponder dump <target>` 导出生成 JSON 到 `run/gtsnponder-generated/`。
-- 取景：相机距离 = 包围盒对角线 × `FIT_FACTOR`（下限 `MIN_CAMERA_DISTANCE`），使结构占据视口主要区域；
-  相机步骤排在搭建之前（全程同一取景）。
-- 高亮可读：控制器金色**线框盒**（全 6 面），仓口 / 总线蓝色细轮廓（按角色分批、总数 ≤ `HATCH_OUTLINE_LIMIT=4`）；
-  旁白含颜色图例（`...narration.legend`，成型文案亦复述）。
-- 旁白机器特定：`narrationArgs` 模板参数（机器标识 / 结构尺寸 / 仓口数量与角色 / 模块位数量），中英双语键。
+- 取景：相机步骤声明 `fit=true` + `margin`（`FIT_MARGIN=0.90`）；视口层 `CameraFraming` 按结构包围盒
+  **与视口纵横比**反算距离并居中，使结构占据视口窄轴约 90%（实测居中、高度 ~92%，消除顶部大黑边）；
+  相机步骤排在搭建之前（全程同一取景），`distance` 仍作为不含视口尺寸时的确定性回退值。**关键**：结构方块
+  放入「无 proxy 世界」的 `TrackedDummyWorld`——若把真实客户端世界当 proxy，`getBlockState` 会返回玩家世界
+  同坐标方块（表现为通用灰石），预览必须用假世界承载结构（与 GT 自带预览一致）。
+- 高亮可读：控制器金色**线框盒**（全 6 面），仓口 / 总线蓝色细线框盒（全 6 面、`inner=1`，从任意角度可见；
+  按角色分批、总数 ≤ `HATCH_OUTLINE_LIMIT=4`，并在角色内 `spread` 均匀抽样避免重叠）。
+- 颜色图例：播放屏左上角**常驻图例区**（金 = 控制器、蓝 = 仓口 / 总线），不再占用旁白句子。
+- 旁白机器特定：`narrationArgs` 模板参数（机器标识 / 结构尺寸 / 仓口数量与角色 / 模块位数量），中英双语键；
+  **成型旁白同样机器特定**（标识 / 尺寸 / 仓口数量与角色 / 模块位数量）。
 - 人类评审门：自动生成的教学质量由人评审截图（`autogen` 自动测试产出），自动化只覆盖结构与确定性。
 
 ### 依赖与类加载纪律

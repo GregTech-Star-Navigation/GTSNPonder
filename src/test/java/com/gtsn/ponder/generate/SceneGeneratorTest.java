@@ -276,9 +276,36 @@ class SceneGeneratorTest {
         assertEquals(List.of("hatch.ITEM_INPUT"), inputStep.targets());
         assertEquals(Boolean.TRUE, inputStep.params().get("visible"));
 
-        // 旁白图例给出颜色含义。
-        assertEquals(SceneGenerator.NARRATION_LEGEND,
-                step(scene, "text.legend").orElseThrow().narration());
+        // 颜色含义移至播放屏常驻图例：不再有 legend 旁白步骤。
+        assertTrue(step(scene, "text.legend").isEmpty(),
+                "the color legend must be a persistent widget, not a narration step");
+    }
+
+    @Test
+    void cameraDeclaresAspectAwareFraming() {
+        SceneStep camera = step(SceneGenerator.generate(medium()), "focus.camera").orElseThrow();
+
+        assertEquals(Boolean.TRUE, camera.params().get("fit"),
+                "auto camera must request aspect-aware framing");
+        assertEquals(SceneGenerator.FIT_MARGIN,
+                ((Number) camera.params().get("margin")).doubleValue(), 1.0e-9d);
+    }
+
+    @Test
+    void formedNarrationIsMachineSpecific() {
+        SceneStep mediumFormed = step(SceneGenerator.generate(medium()), "formed.text").orElseThrow();
+        assertEquals(SceneGenerator.NARRATION_FORMED, mediumFormed.narration());
+        assertEquals(List.of("gtceu:medium_machine", "5x5x5", "2", "ITEM_INPUT, FLUID_OUTPUT", "0"),
+                mediumFormed.narrationArgs(),
+                "formed narration must carry machine id / size / hatch count+roles / module count");
+
+        SceneStep largeFormed = step(SceneGenerator.generate(large()), "formed.text").orElseThrow();
+        assertNotEquals(mediumFormed.narrationArgs(), largeFormed.narrationArgs(),
+                "different machines must produce different formed narration");
+
+        SceneStep moduledFormed = step(SceneGenerator.generate(withModuleSlot()), "formed.text").orElseThrow();
+        assertEquals("1", moduledFormed.narrationArgs().get(4),
+                "module slot count must be part of the formed narration");
     }
 
     @Test

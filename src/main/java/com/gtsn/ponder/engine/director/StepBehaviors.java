@@ -81,7 +81,10 @@ public final class StepBehaviors {
                 step.targets().isEmpty() ? null : step.targets().get(0),
                 SceneParams.number(step.params(), "yaw", 0.0d),
                 SceneParams.number(step.params(), "pitch", 0.0d),
-                SceneParams.number(step.params(), "distance", 0.0d))));
+                SceneParams.number(step.params(), "distance", 0.0d),
+                // 取景自适应：fit=true 时视口按包围盒 + 纵横比反算距离，margin 为目标填充比例。
+                SceneParams.bool(step.params(), "fit", false)
+                        ? SceneParams.number(step.params(), "margin", 0.0d) : 0.0d)));
         registry.put(StepType.IDLE, NOOP);
         registry.put(StepType.INSTALL_MODULE, (step, world) -> {
             String module = SceneParams.string(step.params(), "module", null);

@@ -21,6 +21,7 @@ import com.gtsn.ponder.structure.StructureSource;
 import com.gtsn.ponder.viewport.ViewportWidget;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
@@ -44,6 +45,15 @@ public final class ScenePlayerScreen extends GtsnScreen {
     private static final int NARRATION_LINES = 3;
     private static final int BUTTON_HEIGHT = 18;
     private static final String DEFAULT_TITLE_KEY = "ponder.gtsnponder.player.title";
+
+    /** 常驻颜色图例（金色 = 控制器，蓝色 = 仓口 / 总线）的本地化键。 */
+    private static final String LEGEND_TITLE_KEY = "ponder.gtsnponder.legend.title";
+    private static final String LEGEND_CONTROLLER_KEY = "ponder.gtsnponder.legend.controller";
+    private static final String LEGEND_HATCH_KEY = "ponder.gtsnponder.legend.hatch";
+    private static final int LEGEND_SWATCH = 8;
+    private static final int LEGEND_PAD = 4;
+    private static final int LEGEND_LINE = 10;
+    private static final int LEGEND_MARGIN = 6;
 
     private final StructureSource structure;
     private final SceneData scene;
@@ -254,12 +264,48 @@ public final class ScenePlayerScreen extends GtsnScreen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         viewport.partialTick(partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
+        renderLegend(graphics);
         renderedFrames++;
         if (renderedFrames == 1 || renderedFrames % 120 == 0) {
             LOGGER.info("[GTSNPonder] scene player frame={} step={} time={} playing={} visibleBlocks={}",
                     renderedFrames, playback.stepIndex(), playback.time(), playback.isPlaying(),
                     bridge.visibleBlockCount());
         }
+    }
+
+    /**
+     * 常驻颜色图例：在视口左上角绘制「金色 = 控制器、蓝色 = 仓口 / 总线」的小面板，始终可见，
+     * 从而颜色含义不再挤占旁白句子（见 ticket #7 round-3 反馈 2）。
+     */
+    private void renderLegend(GuiGraphics graphics) {
+        Rect bounds = viewportWidget.bounds();
+        if (bounds.width() < 140 || bounds.height() < 64) {
+            return;
+        }
+        var font = Minecraft.getInstance().font;
+        String title = localized(LEGEND_TITLE_KEY);
+        String controller = localized(LEGEND_CONTROLLER_KEY);
+        String hatch = localized(LEGEND_HATCH_KEY);
+        int textWidth = Math.max(font.width(title), Math.max(font.width(controller), font.width(hatch)));
+        int boxWidth = LEGEND_PAD * 2 + LEGEND_SWATCH + 4 + textWidth;
+        int boxHeight = LEGEND_PAD * 2 + LEGEND_LINE * 3;
+        int x = bounds.x() + LEGEND_MARGIN;
+        int y = bounds.y() + LEGEND_MARGIN;
+        graphics.fill(x, y, x + boxWidth, y + boxHeight, 0xC0101418);
+        graphics.fill(x, y, x + boxWidth, y + 1, 0xFF3A424C);
+        int textX = x + LEGEND_PAD;
+        int rowY = y + LEGEND_PAD;
+        graphics.drawString(font, title, textX, rowY, 0xFFE0E6EE, true);
+        rowY += LEGEND_LINE;
+        drawLegendRow(graphics, font, controller, textX, rowY, DummySceneWorld.HIGHLIGHT_COLOR);
+        rowY += LEGEND_LINE;
+        drawLegendRow(graphics, font, hatch, textX, rowY, DummySceneWorld.OUTLINE_COLOR);
+    }
+
+    private static void drawLegendRow(GuiGraphics graphics, Font font,
+            String label, int x, int y, int color) {
+        graphics.fill(x, y + 1, x + LEGEND_SWATCH, y + 1 + LEGEND_SWATCH, color);
+        graphics.drawString(font, label, x + LEGEND_SWATCH + 4, y, 0xFFFFFFFF, true);
     }
 
     @Override
