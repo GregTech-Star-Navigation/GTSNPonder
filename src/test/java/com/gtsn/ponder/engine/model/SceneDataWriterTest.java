@@ -94,6 +94,29 @@ class SceneDataWriterTest {
     }
 
     @Test
+    void writesStepParamsAndKeyframeUnderTheirOwnKeys() {
+        SceneData scene = SceneData.builder()
+                .formatVersion(SceneDataParser.CURRENT_FORMAT_VERSION)
+                .addStep(SceneStep.builder()
+                        .id("focus")
+                        .type(StepType.CAMERA)
+                        .duration(0)
+                        .param("yaw", 25.0d)
+                        .keyframe(Map.of("frame", 3.0d))
+                        .build())
+                .build();
+
+        String json = SceneDataWriter.toJson(scene);
+
+        assertTrue(json.contains("\"params\""), json);
+        assertTrue(json.contains("\"keyframe\""), json);
+        SceneData parsed = SceneDataParser.parseOrThrow(json);
+        assertEquals(Map.of("yaw", 25.0d), parsed.steps().get(0).params(), json);
+        assertEquals(Map.of("frame", 3.0d), parsed.steps().get(0).keyframe(), json);
+        assertEquals(json, SceneDataWriter.toJson(parsed), "keyframe round-trip must be byte-stable");
+    }
+
+    @Test
     void writesMinimalSceneThatParses() {
         SceneData minimal = SceneData.builder()
                 .formatVersion(SceneDataParser.CURRENT_FORMAT_VERSION)

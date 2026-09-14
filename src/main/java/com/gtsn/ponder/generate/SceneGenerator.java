@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -49,7 +48,8 @@ import java.util.TreeSet;
  * <h2>机器特定旁白</h2>
  * <p>旁白键携带 {@link SceneStep#narrationArgs() 模板参数}（机器名 / 标识 / 结构尺寸 / 仓口数量与
  * 角色 / 模块位数量），同一模板产出机器特定文案；<b>成型旁白同样机器特定</b>（标识 / 尺寸 /
- * 仓口数量与角色 / 模块位数量）。中英双语键见 {@code lang/*.json}。</p>
+ * 仓口数量与角色 / 模块位数量）。场景 {@code title} 亦为本地化键（{@link GeneratedKeys#machineTitleKey}），
+ * 与自动文案一起经 datagen 批量产出中英键（见 {@code com.gtsn.ponder.datagen}）。</p>
  *
  * <h2>成型演示</h2>
  * <p>隐藏全部搭建分段（未成型）→ 重新显示（成型）→ 对控制器发一次成型脉冲 → 成型旁白。</p>
@@ -157,8 +157,8 @@ public final class SceneGenerator {
 
         return SceneData.builder()
                 .formatVersion(SceneDataParser.CURRENT_FORMAT_VERSION)
-                .id("gtsnponder:auto_" + sanitize(source.id()))
-                .title(displayName(source))
+                .id("gtsnponder:auto_" + GeneratedKeys.sanitize(source.id()))
+                .title(GeneratedKeys.machineTitleKey(source.id()))
                 .target(source.id())
                 .variant("default")
                 .source(Source.AUTO)
@@ -417,18 +417,4 @@ public final class SceneGenerator {
         return roles.isEmpty() ? "—" : rolesText(roles);
     }
 
-    private static String displayName(StructureSource source) {
-        return source.displayName() == null ? source.id() : source.displayName();
-    }
-
-    /** 结构 id → 稳定场景 id 片段：小写，非 {@code [a-z0-9_]} 的字符替换为 {@code _}。 */
-    private static String sanitize(String id) {
-        StringBuilder builder = new StringBuilder(id.length());
-        for (char character : id.toLowerCase(Locale.ROOT).toCharArray()) {
-            boolean alphanumeric = (character >= 'a' && character <= 'z')
-                    || (character >= '0' && character <= '9');
-            builder.append(alphanumeric || character == '_' ? character : '_');
-        }
-        return builder.toString();
-    }
 }

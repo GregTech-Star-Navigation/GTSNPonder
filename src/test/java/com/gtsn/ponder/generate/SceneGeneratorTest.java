@@ -183,6 +183,15 @@ class SceneGeneratorTest {
         assertFalse(scene.steps().isEmpty(), "generated scene must have steps");
     }
 
+    @Test
+    void generatedSceneTitleIsTheMachineTitleLocalizationKey() {
+        // 标题必须是本地化键（而非硬编码显示名），与 datagen 产出的机器标题键一一对应。
+        SceneData scene = SceneGenerator.generate(small());
+
+        assertEquals(GeneratedKeys.machineTitleKey("gtceu:small_machine"), scene.title());
+        assertTrue(scene.title().startsWith(GeneratedKeys.MACHINE_TITLE_PREFIX), scene.title());
+    }
+
     // --- 构建顺序 / 预算切换 --------------------------------------------------
 
     @Test

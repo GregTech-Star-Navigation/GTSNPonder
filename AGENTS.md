@@ -61,6 +61,22 @@ $env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成�
   **成型旁白同样机器特定**（标识 / 尺寸 / 仓口数量与角色 / 模块位数量）。
 - 人类评审门：自动生成的教学质量由人评审截图（`autogen` 自动测试产出），自动化只覆盖结构与确定性。
 
+### 场景格式与本地化 datagen（#8）
+
+- **格式冻结**：schema 见 `docs/scene-format.md`（v1 FROZEN）。版本号单一事实源 =
+  `com.gtsn.ponder.engine.model.SceneFormat.CURRENT_VERSION`；已冻结结构的变更须先开 issue / 落 ADR
+  再提升版本并在 `SceneMigrations` 登记 `N → N+1` 迁移。解析器只接受白名单节点形状（反 DSL：
+  `params` / `keyframe` 仅字面量，嵌套对象 / 数组被拒）；未知步骤 `type` 跳过并告警、未知键忽略
+  （前向兼容，且未知步骤在其字段校验之前跳过）。
+- **本地化 datagen**：`com.gtsn.ponder.datagen`（`GtsnPonderDatagen` + `GtsnPonderLanguageProvider`）
+  把全部 lang 键写入 `src/generated/resources/assets/gtsnponder/lang/{en_us,zh_cn}.json`——
+  含自动文案模板键（计数模板如 hatch / module-slot）、颜色图例键、以及每台多方块的机器标题键
+  `ponder.gtsnponder.generated.machine.<id>.title`（**自动场景 title 即此键**）。多个方块枚举经
+  `com.gtsn.ponder.gt.GtMultiblockCatalog`（GT 访问只在该包），中英名取自 GT 随包 lang 资源。
+  **改动生成器文案 / 新增机器后必须重跑 `runData` 并提交产物**；`GeneratedLangKeysTest` 守卫覆盖。
+- datagen 产物提交在 `src/generated/resources/`（`main.resources` 已含该 srcDir）；`src/main/resources`
+  不再放 lang 文件（避免与生成文件同路径冲突）。
+
 ### 依赖与类加载纪律
 
 - **GT import 隔离**：`import com.gregtechceu` 仅允许出现在 `com.gtsn.ponder.gt`；由

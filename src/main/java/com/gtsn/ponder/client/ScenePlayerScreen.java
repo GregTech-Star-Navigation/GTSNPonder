@@ -16,6 +16,7 @@ import com.gtsn.lib.ui.widget.Stack;
 import com.gtsn.lib.ui.widget.TextMetrics;
 import com.gtsn.lib.ui.widget.TextWidget;
 import com.gtsn.ponder.engine.model.SceneData;
+import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.presenter.ScenePlayback;
 import com.gtsn.ponder.structure.StructureSource;
 import com.gtsn.ponder.viewport.ViewportWidget;
@@ -46,10 +47,10 @@ public final class ScenePlayerScreen extends GtsnScreen {
     private static final int BUTTON_HEIGHT = 18;
     private static final String DEFAULT_TITLE_KEY = "ponder.gtsnponder.player.title";
 
-    /** 常驻颜色图例（金色 = 控制器，蓝色 = 仓口 / 总线）的本地化键。 */
-    private static final String LEGEND_TITLE_KEY = "ponder.gtsnponder.legend.title";
-    private static final String LEGEND_CONTROLLER_KEY = "ponder.gtsnponder.legend.controller";
-    private static final String LEGEND_HATCH_KEY = "ponder.gtsnponder.legend.hatch";
+    /** 常驻颜色图例（金色 = 控制器，蓝色 = 仓口 / 总线）的本地化键（单一事实源见 {@link GeneratedKeys}）。 */
+    private static final String LEGEND_TITLE_KEY = GeneratedKeys.LEGEND_TITLE;
+    private static final String LEGEND_CONTROLLER_KEY = GeneratedKeys.LEGEND_CONTROLLER;
+    private static final String LEGEND_HATCH_KEY = GeneratedKeys.LEGEND_HATCH;
     private static final int LEGEND_SWATCH = 8;
     private static final int LEGEND_PAD = 4;
     private static final int LEGEND_LINE = 10;

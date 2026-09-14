@@ -53,7 +53,7 @@ public final class SceneDataWriter {
             JsonObject object = new JsonObject();
             object.addProperty("id", element.id());
             addString(object, "kind", element.kind());
-            addParams(object, element.params());
+            addParams(object, "params", element.params());
             elements.add(object);
         }
         root.add("elements", elements);
@@ -77,8 +77,8 @@ public final class SceneDataWriter {
                 }
                 object.add("narrationArgs", narrationArgs);
             }
-            addParams(object, step.params());
-            addParams(object, step.keyframe());
+            addParams(object, "params", step.params());
+            addParams(object, "keyframe", step.keyframe());
             steps.add(object);
         }
         root.add("steps", steps);
@@ -92,8 +92,8 @@ public final class SceneDataWriter {
         }
     }
 
-    /** 参数映射按键名排序写出（规范化）；空映射省略。 */
-    private static void addParams(JsonObject owner, Map<String, Object> params) {
+    /** 参数映射按键名排序写出（规范化）；空映射省略。{@code params} 与 {@code keyframe} 各有独立键。 */
+    private static void addParams(JsonObject owner, String key, Map<String, Object> params) {
         if (params == null || params.isEmpty()) {
             return;
         }
@@ -101,10 +101,10 @@ public final class SceneDataWriter {
         for (Map.Entry<String, Object> entry : new TreeMap<>(params).entrySet()) {
             object.add(entry.getKey(), toJsonElement(entry.getValue()));
         }
-        owner.add("params", object);
+        owner.add(key, object);
     }
 
-    /** 反 DSL：仅字面量。嵌套结构在解析器里已是原始 JSON 文本，故此处一律按字符串写出。 */
+    /** 反 DSL：仅字面量（解析器已拒绝嵌套结构，故此处只处理基元）。 */
     private static JsonElement toJsonElement(Object value) {
         if (value == null) {
             return JsonNull.INSTANCE;

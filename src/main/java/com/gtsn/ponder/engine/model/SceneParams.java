@@ -7,8 +7,9 @@ import java.util.Map;
 /**
  * 字面量参数映射的读取工具（反 DSL：仅字面量，无表达式 / 算术）。
  *
- * <p>解析器把 JSON 基元转换为 {@code String} / {@code Double} / {@code Boolean} / {@code null}，
- * 嵌套结构以原始 JSON 文本保存（不参与求值）。本类提供不可变拷贝与带默认值的类型化读取。</p>
+ * <p>解析器把 JSON 基元转换为 {@code String} / {@code Double} / {@code Boolean} / {@code null}；
+ * 嵌套对象 / 数组被解析器拒绝（schema 白名单，见 {@code SceneDataParser}）。本类提供不可变拷贝
+ * 与带默认值的类型化读取。</p>
  *
  * <p>纯 Java、零 MC 依赖（导演核心纪律）。</p>
  */

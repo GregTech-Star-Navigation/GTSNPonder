@@ -16,10 +16,15 @@ import java.util.Optional;
 /**
  * 声明式场景 JSON → {@link SceneData} 的解析与显式校验。
  *
- * <p>使用 GSON（MC 无关、随 MC 类路径提供）。校验规则（Ticket #3）：</p>
+ * <p>使用 GSON（MC 无关、随 MC 类路径提供）。校验规则（Ticket #3 / #8）：</p>
  * <ul>
- *   <li>{@code formatVersion} 强制：缺失 / 非整数 / {@code < 1} → {@link SceneFormatException}；</li>
- *   <li>未知步骤 {@code type} → 跳过该步骤并在 {@link SceneParseResult#warnings()} 中告警（前向兼容）；</li>
+ *   <li>{@code formatVersion} 强制：缺失 / 非整数 / {@code < 1} / 高于当前版本
+ *       → {@link SceneFormatException}；合法旧版本先经 {@link SceneMigrations} 逐级迁移；</li>
+ *   <li>schema 白名单（反 DSL 铁律）：根 / 元素 / 步骤必须是对象，{@code targets} / {@code narrationArgs}
+ *       必须是字符串数组，{@code duration} 必须是非负整数，{@code params} / {@code keyframe} 必须
+ *       是对象且<b>仅含字面量</b>（嵌套对象 / 数组被拒绝）；</li>
+ *   <li>未知步骤 {@code type} → 跳过该步骤并在 {@link SceneParseResult#warnings()} 中告警（前向兼容，
+ *       且在其字段做形状校验之前跳过，使未来步骤类型不会拖垮旧解析器）；</li>
  *   <li>未知顶层 / 元素 / 步骤键 → 忽略。</li>
  * </ul>
  *
@@ -27,7 +32,8 @@ import java.util.Optional;
  */
 public final class SceneDataParser {
 
-    public static final int CURRENT_FORMAT_VERSION = 1;
+    /** 当前格式版本（单一事实源见 {@link SceneFormat}；保留此别名以兼容既有引用）。 */
+    public static final int CURRENT_FORMAT_VERSION = SceneFormat.CURRENT_VERSION;
 
     private SceneDataParser() {
     }
@@ -35,7 +41,8 @@ public final class SceneDataParser {
     /**
      * 解析并校验场景 JSON。
      *
-     * @throws SceneFormatException 当 JSON 结构非法或 {@code formatVersion} 缺失 / 非法
+     * @throws SceneFormatException 当 JSON 结构非法、{@code formatVersion} 缺失 / 非法 / 高于当前版本，
+     *         或节点形状不在 schema 白名单内
      */
     public static SceneParseResult parse(String json) {
         JsonElement rootElement;
@@ -50,19 +57,21 @@ public final class SceneDataParser {
         JsonObject root = rootElement.getAsJsonObject();
 
         int formatVersion = readFormatVersion(root);
+        // 版本迁移：旧文档逐级升级到当前版本；未来版本在此清晰拒绝。之后一律按当前结构解析。
+        JsonObject migrated = SceneMigrations.migrateToCurrent(root, formatVersion);
         List<String> warnings = new ArrayList<>();
 
-        List<SceneElement> elements = readElements(root);
-        List<SceneStep> steps = readSteps(root, warnings);
+        List<SceneElement> elements = readElements(migrated);
+        List<SceneStep> steps = readSteps(migrated, warnings);
 
         SceneData scene = SceneData.builder()
-                .formatVersion(formatVersion)
-                .id(optionalString(root, "id"))
-                .title(optionalString(root, "title"))
-                .target(optionalString(root, "target"))
-                .variant(optionalString(root, "variant"))
-                .source(Source.fromJson(optionalString(root, "source"), Source.AUTO))
-                .generatorVersion(optionalString(root, "generatorVersion"))
+                .formatVersion(SceneFormat.CURRENT_VERSION)
+                .id(optionalString(migrated, "id"))
+                .title(optionalString(migrated, "title"))
+                .target(optionalString(migrated, "target"))
+                .variant(optionalString(migrated, "variant"))
+                .source(Source.fromJson(optionalString(migrated, "source"), Source.AUTO))
+                .generatorVersion(optionalString(migrated, "generatorVersion"))
                 .elements(elements)
                 .steps(steps)
                 .build();
@@ -113,7 +122,8 @@ public final class SceneDataParser {
             if (id == null || id.isBlank()) {
                 throw new SceneFormatException("scene element is missing a non-blank 'id'");
             }
-            elements.add(SceneElement.of(id, optionalString(element, "kind"), readParams(element.get("params"))));
+            elements.add(SceneElement.of(id, optionalString(element, "kind"),
+                    readParams(element.get("params"), "scene element '" + id + "' field 'params'")));
         }
         return elements;
     }
@@ -148,10 +158,10 @@ public final class SceneDataParser {
                     .type(type.get())
                     .duration(readDuration(step, stepId))
                     .targets(readStringArray(step, "targets", stepId))
-                    .params(readParams(step.get("params")))
+                    .params(readParams(step.get("params"), "step '" + stepId + "' field 'params'"))
                     .narration(optionalString(step, "narration"))
                     .narrationArgs(readStringArray(step, "narrationArgs", stepId))
-                    .keyframe(readParams(step.get("keyframe")))
+                    .keyframe(readParams(step.get("keyframe"), "step '" + stepId + "' field 'keyframe'"))
                     .build());
         }
         return steps;
@@ -190,24 +200,25 @@ public final class SceneDataParser {
         return values;
     }
 
-    private static Map<String, Object> readParams(JsonElement raw) {
+    private static Map<String, Object> readParams(JsonElement raw, String context) {
         if (raw == null || raw.isJsonNull()) {
             return Map.of();
         }
         if (!raw.isJsonObject()) {
-            throw new SceneFormatException("'params' / 'keyframe' must be a JSON object");
+            throw new SceneFormatException(context + " must be a JSON object");
         }
         Map<String, Object> params = new LinkedHashMap<>();
         for (Map.Entry<String, JsonElement> entry : raw.getAsJsonObject().entrySet()) {
-            params.put(entry.getKey(), toLiteral(entry.getValue()));
+            params.put(entry.getKey(), toLiteral(entry.getKey(), entry.getValue(), context));
         }
         return params;
     }
 
     /**
-     * 反 DSL：仅接受字面量。嵌套对象 / 数组以原始 JSON 文本保存，不参与任何求值。
+     * 反 DSL：字面量参数<b>只</b>接受 {@code string} / {@code number} / {@code boolean} / {@code null}；
+     * 嵌套对象 / 数组被拒绝（schema 白名单，格式不得退化为编程语言）。
      */
-    private static Object toLiteral(JsonElement element) {
+    private static Object toLiteral(String key, JsonElement element, String context) {
         if (element == null || element.isJsonNull()) {
             return null;
         }
@@ -221,7 +232,8 @@ public final class SceneDataParser {
             }
             return primitive.getAsString();
         }
-        return element.toString();
+        throw new SceneFormatException(context + " value '" + key
+                + "' must be a literal (string / number / boolean / null); nested objects and arrays are not allowed");
     }
 
     private static String optionalString(JsonObject owner, String key) {
