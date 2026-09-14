@@ -60,11 +60,18 @@ dependencies {
     modImplementation("com.tterrag.registrate:Registrate:${forge.versions.registrate.get()}")
     modImplementation("dev.toma.configuration:configuration-forge-1.20.1:${forge.versions.configuration.get()}") { transitive = false }
 
-    // 软依赖（#11）：JEI / EMI 的 dev-only 编译期依赖。仅 modCompileOnly —— 不进入运行时
-    // classpath，故 JEI / EMI 缺席时集成类永不加载（零 NoClassDefFoundError，功能降级）；
-    // 由 mods.toml 的 optional 块声明运行时软依赖。transitive=false：不拉取它们的传递依赖。
+    // 软依赖（#11）：JEI / EMI 的编译期依赖。仅 modCompileOnly —— 集成类在二者缺席时
+    // 永不加载（零 NoClassDefFoundError，功能降级）；由 mods.toml 的 optional 块声明运行时软依赖。
+    // transitive=false：不拉取它们的传递依赖。
     modCompileOnly("mezz.jei:jei-1.20.1-forge:${forge.versions.jei.get()}") { transitive = false }
     modCompileOnly("dev.emi:emi-forge:${forge.versions.emi.get()}") { transitive = false }
+
+    // dev 运行时联调（#11 补充）：modRuntimeOnly 是 legacyforge 的「仅运行时」mod 配置
+    // （SRG → official 重映射后进入开发态运行时 classpath），故 runClient / runGameTestServer
+    // 实际加载 JEI / EMI，机器页「思索」入口可在游戏内验证。玩家侧语义不变：仍然只在
+    // mods.toml 声明 optional（生产 jar 不携带 / 不要求它们）。legacyforge 无 modLocalRuntime。
+    modRuntimeOnly("mezz.jei:jei-1.20.1-forge:${forge.versions.jei.get()}") { transitive = false }
+    modRuntimeOnly("dev.emi:emi-forge:${forge.versions.emi.get()}") { transitive = false }
 }
 
 test {
