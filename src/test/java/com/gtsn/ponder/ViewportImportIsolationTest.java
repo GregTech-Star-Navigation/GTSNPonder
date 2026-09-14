@@ -17,8 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 纯逻辑包纪律检查：{@code com.gtsn.ponder.viewport}（视口契约 / 相机状态机 / 几何）、
  * {@code com.gtsn.ponder.structure}（中立结构 DTO）、{@code com.gtsn.ponder.bridge}
- * （元素 → 坐标解析）、{@code com.gtsn.ponder.presenter}（时间轴绑定）与
- * {@code com.gtsn.ponder.generate}（自动生成器）必须保持纯 Java——不得
+ * （元素 → 坐标解析）、{@code com.gtsn.ponder.presenter}（时间轴绑定）、
+ * {@code com.gtsn.ponder.generate}（自动生成器）与 {@code com.gtsn.ponder.editor}
+ * （编辑器纯逻辑：草稿 / 记录器 / 存储 / 门控 / 会话）必须保持纯 Java——不得
  * import {@code net.minecraft}，也不得 import {@code com.gregtechceu}（GT 访问只属于
  * {@code com.gtsn.ponder.gt}）。以可失败断言自证可 headless 单测。
  */
@@ -29,7 +30,8 @@ class ViewportImportIsolationTest {
             Path.of("src", "main", "java", "com", "gtsn", "ponder", "structure"),
             Path.of("src", "main", "java", "com", "gtsn", "ponder", "bridge"),
             Path.of("src", "main", "java", "com", "gtsn", "ponder", "presenter"),
-            Path.of("src", "main", "java", "com", "gtsn", "ponder", "generate"));
+            Path.of("src", "main", "java", "com", "gtsn", "ponder", "generate"),
+            Path.of("src", "main", "java", "com", "gtsn", "ponder", "editor"));
 
     private static final Pattern MINECRAFT_IMPORT =
             Pattern.compile("(?m)^\\s*import\\s+(?:static\\s+)?net\\.minecraft\\b");

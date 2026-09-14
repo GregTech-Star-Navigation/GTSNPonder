@@ -1,5 +1,6 @@
 package com.gtsn.ponder.datagen;
 
+import com.gtsn.ponder.editor.EditorKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.gt.GtMultiblockCatalog;
@@ -86,6 +87,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.message.no_world", "Join a world before opening ponder.");
         keys.put("ponder.gtsnponder.message.dump", "Generated scene written to %s");
         keys.put("ponder.gtsnponder.message.dump_failed", "Could not write the generated scene: %s");
+        editorKeys(keys, false);
         return keys;
     }
 
@@ -126,6 +128,87 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.message.no_world", "请先进入世界再打开思索。");
         keys.put("ponder.gtsnponder.message.dump", "已把生成场景写入 %s");
         keys.put("ponder.gtsnponder.message.dump_failed", "写入生成场景失败：%s");
+        editorKeys(keys, true);
         return keys;
+    }
+
+    /**
+     * 游戏内编辑器的界面 / 状态键（中英双语）：屏幕标题、录制动作、属性字段、控制按钮、状态与门控提示，
+     * 以及「录制旁白」动作写入的默认旁白键。键集中定义在 {@link EditorKeys}。
+     */
+    private static void editorKeys(Map<String, String> keys, boolean chinese) {
+        if (chinese) {
+            keys.put(EditorKeys.TITLE, "思索编辑器");
+            keys.put(EditorKeys.RECORD, "录制");
+            keys.put(EditorKeys.ACTION_SHOW, "显示分段");
+            keys.put(EditorKeys.ACTION_HIDE, "隐藏分段");
+            keys.put(EditorKeys.ACTION_HIGHLIGHT, "高亮");
+            keys.put(EditorKeys.ACTION_NARRATE, "旁白");
+            keys.put(EditorKeys.ACTION_CAMERA, "相机");
+            keys.put(EditorKeys.SECTION_HEADER, "场景头部");
+            keys.put(EditorKeys.SECTION_RECORD, "录制动作");
+            keys.put(EditorKeys.SECTION_STEPS, "步骤");
+            keys.put(EditorKeys.SECTION_PROPERTIES, "属性");
+            keys.put(EditorKeys.FIELD_ID, "ID");
+            keys.put(EditorKeys.FIELD_TITLE, "标题");
+            keys.put(EditorKeys.FIELD_TARGET, "目标");
+            keys.put(EditorKeys.FIELD_DURATION, "时长");
+            keys.put(EditorKeys.FIELD_NARRATION, "旁白键");
+            keys.put(EditorKeys.FIELD_YAW, "偏航");
+            keys.put(EditorKeys.FIELD_PITCH, "俯仰");
+            keys.put(EditorKeys.FIELD_DISTANCE, "距离");
+            keys.put(EditorKeys.STEP_PREV, "<");
+            keys.put(EditorKeys.STEP_NEXT, ">");
+            keys.put(EditorKeys.STEP_NONE, "（无步骤）");
+            keys.put(EditorKeys.SAVE, "保存");
+            keys.put(EditorKeys.EXPORT, "导出生成");
+            keys.put(EditorKeys.RELOAD, "保存并重载重放");
+            keys.put(EditorKeys.CLOSE, "关闭");
+            keys.put(EditorKeys.STATUS_READY, "就绪");
+            keys.put(EditorKeys.STATUS_SAVED, "已保存：%s");
+            keys.put(EditorKeys.STATUS_SAVE_FAILED, "保存失败：%s");
+            keys.put(EditorKeys.STATUS_EXPORTED, "已载入自动生成基线：%s");
+            keys.put(EditorKeys.STATUS_RECORD_ON, "录制已开启：动作将写入场景");
+            keys.put(EditorKeys.STATUS_RECORD_OFF, "录制未开启（请先勾选「录制」）");
+            keys.put(EditorKeys.STATUS_RECORDED, "已录制 %s 步（共 %s 步）");
+            keys.put(EditorKeys.GATED, "编辑器仅作者 / 开发可用（正式玩家不可见）。");
+            keys.put(EditorKeys.RECORD_NARRATION, "作者录制的旁白：在此填写讲解内容。");
+            return;
+        }
+        keys.put(EditorKeys.TITLE, "Ponder Editor");
+        keys.put(EditorKeys.RECORD, "Record");
+        keys.put(EditorKeys.ACTION_SHOW, "Show section");
+        keys.put(EditorKeys.ACTION_HIDE, "Hide section");
+        keys.put(EditorKeys.ACTION_HIGHLIGHT, "Highlight");
+        keys.put(EditorKeys.ACTION_NARRATE, "Narrate");
+        keys.put(EditorKeys.ACTION_CAMERA, "Camera");
+        keys.put(EditorKeys.SECTION_HEADER, "Scene header");
+        keys.put(EditorKeys.SECTION_RECORD, "Record actions");
+        keys.put(EditorKeys.SECTION_STEPS, "Steps");
+        keys.put(EditorKeys.SECTION_PROPERTIES, "Properties");
+        keys.put(EditorKeys.FIELD_ID, "ID");
+        keys.put(EditorKeys.FIELD_TITLE, "Title");
+        keys.put(EditorKeys.FIELD_TARGET, "Target");
+        keys.put(EditorKeys.FIELD_DURATION, "Duration");
+        keys.put(EditorKeys.FIELD_NARRATION, "Narration key");
+        keys.put(EditorKeys.FIELD_YAW, "Yaw");
+        keys.put(EditorKeys.FIELD_PITCH, "Pitch");
+        keys.put(EditorKeys.FIELD_DISTANCE, "Distance");
+        keys.put(EditorKeys.STEP_PREV, "<");
+        keys.put(EditorKeys.STEP_NEXT, ">");
+        keys.put(EditorKeys.STEP_NONE, "(no steps)");
+        keys.put(EditorKeys.SAVE, "Save");
+        keys.put(EditorKeys.EXPORT, "Export generated");
+        keys.put(EditorKeys.RELOAD, "Save + reload + replay");
+        keys.put(EditorKeys.CLOSE, "Close");
+        keys.put(EditorKeys.STATUS_READY, "Ready");
+        keys.put(EditorKeys.STATUS_SAVED, "Saved: %s");
+        keys.put(EditorKeys.STATUS_SAVE_FAILED, "Save failed: %s");
+        keys.put(EditorKeys.STATUS_EXPORTED, "Loaded generated baseline: %s");
+        keys.put(EditorKeys.STATUS_RECORD_ON, "Recording on: actions become steps");
+        keys.put(EditorKeys.STATUS_RECORD_OFF, "Recording is off (enable the Record toggle first)");
+        keys.put(EditorKeys.STATUS_RECORDED, "Recorded %s step(s) (scene has %s)");
+        keys.put(EditorKeys.GATED, "The editor is available to authors / developers only.");
+        keys.put(EditorKeys.RECORD_NARRATION, "Author-recorded narration: describe the step here.");
     }
 }

@@ -1,5 +1,8 @@
 package com.gtsn.ponder.client;
 
+import com.gtsn.ponder.editor.EditorKeys;
+import com.gtsn.ponder.editor.EditorSession;
+import com.gtsn.ponder.editor.SceneDraft;
 import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.SceneDataWriter;
 import com.gtsn.ponder.generate.SceneGenerator;
@@ -103,6 +106,79 @@ public final class PonderEntrypoints {
         minecraft.execute(() -> minecraft.setScreen(
                 new ScenePlayerScreen(sceneToOpen, sourceToOpen, minecraft.level)));
         return true;
+    }
+
+    /**
+     * 编辑器入口（快捷键 / 客户端命令，仅门控通过时）：为注视目标打开游戏内可视化编辑器。
+     */
+    public static boolean openEditorForLookedAtTarget() {
+        Minecraft minecraft = Minecraft.getInstance();
+        Player player = minecraft.player;
+        if (player == null || minecraft.level == null) {
+            message("ponder.gtsnponder.message.no_world");
+            return false;
+        }
+        HitResult hit = player.pick(REACH, 0.0F, false);
+        if (!(hit instanceof BlockHitResult blockHit) || blockHit.getType() != HitResult.Type.BLOCK) {
+            message("ponder.gtsnponder.message.no_target");
+            return false;
+        }
+        BlockPos pos = blockHit.getBlockPos();
+        String blockId = BuiltInRegistries.BLOCK.getKey(minecraft.level.getBlockState(pos).getBlock()).toString();
+        return openEditor(blockId);
+    }
+
+    /**
+     * 确定性编辑器入口（客户端命令 {@code /gtsnponder editor [target]} / 自动测试）：为目标打开编辑器。
+     * 门控未通过（正式玩家默认）时拒绝并提示。草稿种子：已有手作 / 作者场景优先，否则自动生成基线
+     * （「导出自动场景为草稿」后即可编辑）。
+     */
+    public static boolean openEditor(String target) {
+        if (!PonderEditorAccess.isEditorEnabled()) {
+            message(EditorKeys.GATED);
+            return false;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            message("ponder.gtsnponder.message.no_world");
+            return false;
+        }
+        Optional<StructureSource> structure = GtStructureAdapter.byId(target);
+        if (structure.isEmpty()) {
+            message("ponder.gtsnponder.message.no_scene", target);
+            return false;
+        }
+        StructureSource source = structure.get();
+        SceneData seed = SceneLibrary.get().sceneForTarget(target)
+                .orElseGet(() -> SceneGenerator.generate(source));
+        EditorSession session = EditorSession.startingFrom(seed, SceneLibrary.get().authorDirectory());
+        minecraft.execute(() -> minecraft.setScreen(new SceneEditorScreen(source, minecraft.level, session)));
+        return true;
+    }
+
+    /**
+     * 开发 / 作者入口：把目标的自动生成场景导出为<b>手作草稿</b>并写入可写作者目录（场景库随即热重载），
+     * 使作者从生成基线开始编辑。返回写出文件路径；门控未通过 / 目标无效时为空。
+     */
+    public static Optional<Path> exportGeneratedDraft(String target) {
+        if (!PonderEditorAccess.isEditorEnabled()) {
+            message(EditorKeys.GATED);
+            return Optional.empty();
+        }
+        Optional<StructureSource> structure = GtStructureAdapter.byId(target);
+        if (structure.isEmpty()) {
+            message("ponder.gtsnponder.message.no_scene", target);
+            return Optional.empty();
+        }
+        SceneData draft = SceneDraft.from(SceneGenerator.generate(structure.get())).toSceneData();
+        try {
+            Path file = SceneLibrary.get().saveAuthorScene(draft);
+            message("ponder.gtsnponder.message.dump", file.toString());
+            return Optional.of(file);
+        } catch (IOException failure) {
+            message("ponder.gtsnponder.message.dump_failed", String.valueOf(failure.getMessage()));
+            return Optional.empty();
+        }
     }
 
     /**

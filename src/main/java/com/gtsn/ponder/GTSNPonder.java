@@ -18,5 +18,6 @@ public class GTSNPonder {
 
     public GTSNPonder() {
         LOGGER.info("[GTSNPonder] Loading GTSNPonder");
+        PonderConfig.register();
     }
 }

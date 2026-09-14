@@ -39,6 +39,7 @@ GitHub Issues（`gh` CLI），仓库 `GregTech-Star-Navigation/GTSNPonder`。见
 $env:GTSNPONDER_UI_AUTOTEST="viewport"; .\gradlew.bat runClient  # 视口嵌入自动测试（#4）：载入存档 → 渲染真实 GT 多方块 → 拖拽/缩放/覆盖层点击/resize 断言 → 截图 run/screenshots/gtsnponder-viewport.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="scene"; .\gradlew.bat runClient  # 场景播放自动测试（#5）：载入存档 → 打开 gtceu:coke_oven 的思索屏 → 步骤/旁白/暂停/seek/重播断言 → 截图 run/screenshots/gtsnponder-scene.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成自动测试（#7）：载入存档 → 解析小/中/大三台真实 GT 多方块 → 强制自动生成并播放 → 确定性断言 → 每台两张截图 run/screenshots/gtsnponder-autogen-<n>-<machine>-reveal.png 与 -formed.png（揭示中 / 成型）→ 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="editor"; .\gradlew.bat runClient  # 游戏内编辑器自动测试（#9）：载入存档 → 打开编辑器 → 录制 2 步 + 微调时长 → 保存 → 场景库热重载 → 重放并断言编辑后的旁白 → 截图 run/screenshots/gtsnponder-editor.png → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -76,6 +77,31 @@ $env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成�
   **改动生成器文案 / 新增机器后必须重跑 `runData` 并提交产物**；`GeneratedLangKeysTest` 守卫覆盖。
 - datagen 产物提交在 `src/generated/resources/`（`main.resources` 已含该 srcDir）；`src/main/resources`
   不再放 lang 文件（避免与生成文件同路径冲突）。
+
+### 游戏内可视化编辑器（#9）
+
+- **单一 DTO**：编辑器编辑运行时同一 v1 DTO（`com.gtsn.ponder.engine.model`）。纯逻辑核心在
+  `com.gtsn.ponder.editor`（加入 import 隔离纯包）：`SceneDraft`（可变草稿，`toSceneData()` 以
+  `SceneFormat.CURRENT_VERSION` 产出冻结 v1）、`SceneRecorder`（边做边录：显示 / 隐藏分段、高亮、
+  轮廓、旁白、相机 → 受封闭 `StepType` 约束的有序 `SceneStep`）、`DraftStore`（经 `SceneDataWriter`
+  / `SceneDataParser` 读写）、`EditorGate`（门控谓词）、`EditorSession`（录制 → 保存 → 重载回路）。
+  界面 `com.gtsn.ponder.client.SceneEditorScreen` 用 GTSN UI 构建（ADR-0004）：左侧 LDLib 视口预览，
+  右侧录制动作 + 步骤选择 + 属性表单（时长 / 目标 / 旁白键 / 相机），底部保存 / 导出生成 / 保存并
+  热重载重放。属性表单文本框为 `EditorTextField`（GTSN UI 控件；库无内置输入框）。反 DSL：只写字段
+  字面量，无表达式 / 循环 / 条件。
+- **保存位置与热重载**：编辑器保存写到手写作者目录 `<gameDir>/gtsnponder-scenes/`（`SceneLibrary`
+  除资源包外**第二个扫描来源**，作者场景后加载故覆盖随包场景）。`SceneLibrary.saveAuthorScene()` 写出
+  后自动 `reload()`，故保存即重编译、无需重启即可重放编辑后的场景（`source=hand`）。
+- **导出自动场景为草稿**：编辑器「导出生成」按钮 / `/gtsnponder export <target>` 把
+  `SceneGenerator` 产物经 `SceneDraft.from(...)`（AUTO → HAND）写成作者草稿，作者从生成基线起步编辑。
+- **门控**：`EditorGate.isEnabled(production, configOptIn, devOverride)`——开发态（`runClient` /
+  客户端自动测试）恒可见；正式玩家默认隐藏（`FMLEnvironment.production=true` 且未选择加入）。
+  `PonderEditorAccess` 运行时解析：配置 `editor.editorEnabled`（Forge 客户端配置，默认 false）或
+  系统属性 `-Dgtsnponder.editor=true`。入口 `/gtsnponder editor [target]`（客户端命令，未通过门控仅提示）。
+- **自动测试**：`GTSNPONDER_UI_AUTOTEST=editor`（见上）：打开编辑器 → 录制 2 步 + 时长 +5 → 保存 →
+  断言文件为合法 v1 且步骤/旁白齐全 → 场景库热重载 → 断言重放的是 `source=hand` 手作场景且
+  seek 到录制步骤时旁白键为录制键 → 截图。目标选 `gtceu:steam_grinder` 等（规避 `scene` 的焦炉目标，
+  避免作者场景覆盖随包场景造成相互污染）。
 
 ### 依赖与类加载纪律
 

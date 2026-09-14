@@ -21,6 +21,9 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
  *         <li>{@code /gtsnponder generate <target>}——强制自动生成并播放（开发者 / 自动测试）；</li>
  *         <li>{@code /gtsnponder dump <target>}——把自动生成的场景 JSON 导出到
  *             {@code run/gtsnponder-generated/}（作者草稿起点 / 生成器 diff）。</li>
+ *         <li>{@code /gtsnponder editor [target]}——打开游戏内可视化编辑器（<b>门控</b>：仅作者 / 开发，
+ *             正式玩家不可见）；</li>
+ *         <li>{@code /gtsnponder export <target>}——把自动生成场景导出为手作草稿到可写作者目录（门控）。</li>
  *       </ul>
  *   </li>
  *   <li>每客户端 tick：推进当前 {@link ScenePlayerScreen}（若存在），并消费快捷键点击
@@ -50,6 +53,15 @@ public final class PonderClientEvents {
                 .then(Commands.literal("dump")
                         .then(Commands.argument("target", StringArgumentType.string())
                                 .executes(context -> PonderEntrypoints.dumpGenerated(
+                                        StringArgumentType.getString(context, "target")).isPresent() ? 1 : 0)))
+                .then(Commands.literal("editor")
+                        .executes(context -> PonderEntrypoints.openEditorForLookedAtTarget() ? 1 : 0)
+                        .then(Commands.argument("target", StringArgumentType.string())
+                                .executes(context -> PonderEntrypoints.openEditor(
+                                        StringArgumentType.getString(context, "target")) ? 1 : 0)))
+                .then(Commands.literal("export")
+                        .then(Commands.argument("target", StringArgumentType.string())
+                                .executes(context -> PonderEntrypoints.exportGeneratedDraft(
                                         StringArgumentType.getString(context, "target")).isPresent() ? 1 : 0))));
     }
 
@@ -61,6 +73,8 @@ public final class PonderClientEvents {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen instanceof ScenePlayerScreen screen) {
             screen.advance();
+        } else if (minecraft.screen instanceof SceneEditorScreen editor) {
+            editor.advance();
         }
         int presses = 0;
         while (PonderEntrypoints.PONDER_KEY.consumeClick()) {
