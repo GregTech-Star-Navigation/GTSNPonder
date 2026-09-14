@@ -35,7 +35,8 @@ class CameraFramingTest {
 
     @Test
     void fitCentersAndFillsTheProjectedBoundingBox() {
-        double fill = 0.9d;
+        // 请求值高于小余量下限（{@link CameraFraming#MIN_LIMITING_OCCUPANCY}）时必须被如实采纳。
+        double fill = 0.95d;
         CameraFraming.Fit fit = CameraFraming.fit(5, 5, 5, YAW, PITCH, VIEW_W, VIEW_H, FOV, fill);
         double[] bounds = projectedBounds(5, 5, 5, fit, VIEW_W, VIEW_H);
 
@@ -49,6 +50,39 @@ class CameraFramingTest {
                 "the projected bounding box must be vertically centered");
         assertTrue(Math.abs((bounds[2] + bounds[3]) / 2.0d) < 1.0e-3d,
                 "the projected bounding box must be horizontally centered");
+    }
+
+    @Test
+    void fitFillsTheWideViewportsLimitingDimensionAtTheSmallMarginFloor() {
+        // 生成器请求 0.90（保守下界）；宽视口（约 2.6:1）下限制维是高度——高度必须被填到
+        // MIN_LIMITING_OCCUPANCY（小余量，无大片黑边），且结构整体居中。
+        double requested = 0.90d;
+        for (double[] size : new double[][] { { 3, 3, 3 }, { 5, 4, 3 }, { 5, 5, 5 } }) {
+            CameraFraming.Fit fit = CameraFraming.fit(
+                    size[0], size[1], size[2], YAW, PITCH, VIEW_W, VIEW_H, FOV, requested);
+            double[] bounds = projectedBounds(size[0], size[1], size[2], fit, VIEW_W, VIEW_H);
+            double verticalSpan = bounds[1] - bounds[0];
+            double horizontalSpan = bounds[3] - bounds[2];
+
+            assertTrue(verticalSpan >= horizontalSpan - 1.0e-9d,
+                    "a wide viewport must be limited by height: vertical=" + verticalSpan
+                            + " horizontal=" + horizontalSpan);
+            assertEquals(2.0d * CameraFraming.MIN_LIMITING_OCCUPANCY, verticalSpan, 1.0e-3d,
+                    "the limiting dimension (height) must be filled to the small-margin floor");
+            assertTrue(Math.abs((bounds[0] + bounds[1]) / 2.0d) < 1.0e-3d,
+                    "the structure must be vertically centered");
+            assertTrue(Math.abs((bounds[2] + bounds[3]) / 2.0d) < 1.0e-3d,
+                    "the structure must be horizontally centered");
+        }
+    }
+
+    @Test
+    void occupancyIsClampedToTheSmallMarginFloorForLowerRequests() {
+        CameraFraming.Fit fit = CameraFraming.fit(3, 3, 3, YAW, PITCH, VIEW_W, VIEW_H, FOV, 0.50d);
+        double[] bounds = projectedBounds(3, 3, 3, fit, VIEW_W, VIEW_H);
+
+        assertEquals(2.0d * CameraFraming.MIN_LIMITING_OCCUPANCY, bounds[1] - bounds[0], 1.0e-3d,
+                "requests below the small-margin floor must be raised to it");
     }
 
     @Test

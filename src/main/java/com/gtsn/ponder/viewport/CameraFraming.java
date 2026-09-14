@@ -19,12 +19,13 @@ package com.gtsn.ponder.viewport;
  *
  * <h2>求解</h2>
  * <ol>
- *   <li><b>距离</b>：把包围盒 8 角投到相机空间；结构投影<b>跨度</b>只受距离影响（沿视线方向平移
- *       不改变各角深度），故以二分法求「投影跨度 ≤ {@code 2·fill}」的最小距离，使结构占据视口
- *       窄轴约 {@code fill} 比例。</li>
+ *   <li><b>距离（填满限制维）</b>：把包围盒 8 角投到相机空间；结构投影<b>跨度</b>只受距离影响（沿视线
+ *       方向平移不改变各角深度），故以二分法求「投影跨度 ≤ {@code 2·target}」的最小距离，使结构占据
+ *       视口<b>限制维</b>（两个投影跨度中较大的那个轴；宽视口下即高度）约 {@code target} 比例。
+ *       {@code target} = 请求值钳制到 {@value #MIN_LIMITING_OCCUPANCY}..{@value #MAX_FILL}。</li>
  *   <li><b>居中</b>：透视下近端角比远端角放大更多，直接对准包围盒中心会让投影包围盒偏移
  *       （出现一侧大黑边）。本类再求一个沿相机 right / up 的视线中心偏移，使投影包围盒居中；
- *       偏移与投影偏移近似线性，迭代数次收敛。</li>
+ *       偏移与投影偏移近似线性，迭代 {@value #CENTER_ITERATIONS} 次收敛（残余偏移 &lt; 1e-6）。</li>
  * </ol>
  *
  * <p>纯 Java、零 MC / LDLib 依赖；{@code com.gtsn.ponder.viewport} 包纪律由
@@ -35,14 +36,28 @@ public final class CameraFraming {
     /** LDLib {@code WorldSceneRenderer} 的默认垂直 FOV（度）；{@code LdlibSceneViewport} 不改它。 */
     public static final double DEFAULT_FOV_Y_DEGREES = 60.0d;
 
-    /** 填充目标下限（安全钳制）。 */
-    public static final double MIN_FILL = 0.30d;
     /** 填充目标上限（安全钳制）：1.0 表示恰好贴边，留一点余量更稳。 */
     public static final double MAX_FILL = 0.98d;
 
+    /**
+     * 取景自适应下「限制维」的最小占用比例（小余量下限）：限制维 = 视口的窄轴，宽视口即<b>高度</b>。
+     * 请求值低于此下限时按下限取景，使结构始终填满限制维、只留约 {@code 1 - 0.92 = 8%} 的总余量
+     * （每侧约 4%），消除「结构偏小 / 四周大片黑边」的观感。视口宽高比是唯一硬约束：宽视口下立方体
+     * 结构按面积无法填满，故以「填满限制维 + 垂直居中」为可达目标。
+     *
+     * <p>生成器写入的 {@code margin=0.90} 是保守下界；取景层据此下限抬升到 0.92，保证无论场景请求
+     * 多保守，画面都不会留下大片空白。</p>
+     */
+    public static final double MIN_LIMITING_OCCUPANCY = 0.92d;
+
     private static final double EPSILON = 1.0e-9d;
     private static final int BISECTION_STEPS = 80;
-    private static final int CENTER_ITERATIONS = 16;
+    /**
+     * 居中定点迭代次数：占用越高，透视近大远小的非线性越强，直接对准包围盒中心的残余偏移越大
+     * （16 次迭代在 0.92 占用下约 {@code 1e-3}，在 0.95 下约 {@code 2.4e-3}）。64 次迭代把残余
+     * 偏移压到 {@code ~1e-9}，保证高占用下仍严格垂直 / 水平居中。
+     */
+    private static final int CENTER_ITERATIONS = 64;
 
     private CameraFraming() {
     }
@@ -70,7 +85,8 @@ public final class CameraFraming {
      * @param viewportWidth 视口像素宽（&gt; 0）
      * @param viewportHeight 视口像素高（&gt; 0）
      * @param fovYDegrees 垂直 FOV（度）
-     * @param fill 目标填充比例（{@code (0,1]}，钳制到 {@value #MIN_FILL}..{@value #MAX_FILL}）
+     * @param fill 目标填充比例（{@code (0,1]}）；钳制到 {@value #MIN_LIMITING_OCCUPANCY}..{@value #MAX_FILL}，
+     *             即请求低于小余量下限时按 {@value #MIN_LIMITING_OCCUPANCY} 取景（限制维始终填满）
      * @return 取景结果；输入退化（尺寸 / 视口非正）时返回 {@link Fit#none()}
      */
     public static Fit fit(double sizeX, double sizeY, double sizeZ,
@@ -81,7 +97,7 @@ public final class CameraFraming {
                 || !(viewportWidth > 0.0d) || !(viewportHeight > 0.0d)) {
             return Fit.none();
         }
-        double clampedFill = clamp(fill, MIN_FILL, MAX_FILL);
+        double clampedFill = clamp(fill, MIN_LIMITING_OCCUPANCY, MAX_FILL);
         Basis basis = basis(rotationYawDeg, rotationPitchDeg);
         double tanY = Math.tan(Math.toRadians(fovYDegrees) / 2.0d);
         if (tanY < EPSILON) {
