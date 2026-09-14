@@ -46,6 +46,8 @@ public final class PonderClientEvents {
                         .then(Commands.argument("target", StringArgumentType.string())
                                 .executes(context -> PonderEntrypoints.openForTarget(
                                         StringArgumentType.getString(context, "target")) ? 1 : 0)))
+                .then(Commands.literal("catalog")
+                        .executes(context -> PonderEntrypoints.openCatalog() ? 1 : 0))
                 .then(Commands.literal("generate")
                         .then(Commands.argument("target", StringArgumentType.string())
                                 .executes(context -> PonderEntrypoints.openGenerated(
@@ -82,6 +84,13 @@ public final class PonderClientEvents {
         }
         if (presses > 0 && minecraft.screen == null) {
             PonderEntrypoints.openForLookedAtTarget();
+        }
+        int catalogPresses = 0;
+        while (PonderEntrypoints.CATALOG_KEY.consumeClick()) {
+            catalogPresses++;
+        }
+        if (catalogPresses > 0 && minecraft.screen == null) {
+            PonderEntrypoints.openCatalog();
         }
     }
 }

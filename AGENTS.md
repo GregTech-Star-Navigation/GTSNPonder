@@ -40,6 +40,7 @@ $env:GTSNPONDER_UI_AUTOTEST="viewport"; .\gradlew.bat runClient  # 视口嵌入�
 $env:GTSNPONDER_UI_AUTOTEST="scene"; .\gradlew.bat runClient  # 场景播放自动测试（#5）：载入存档 → 打开 gtceu:coke_oven 的思索屏 → 步骤/旁白/暂停/seek/重播断言 → 截图 run/screenshots/gtsnponder-scene.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成自动测试（#7）：载入存档 → 解析小/中/大三台真实 GT 多方块 → 强制自动生成并播放 → 确定性断言 → 每台两张截图 run/screenshots/gtsnponder-autogen-<n>-<machine>-reveal.png 与 -formed.png（揭示中 / 成型）→ 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="editor"; .\gradlew.bat runClient  # 游戏内编辑器自动测试（#9）：载入存档 → 打开编辑器 → 录制 2 步 + 微调时长 → 保存 → 场景库热重载 → 重放并断言编辑后的旁白 → 截图 run/screenshots/gtsnponder-editor.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="catalog"; .\gradlew.bat runClient  # 图鉴目录自动测试（#11）：载入存档 → 清空进度并按需补种子作者场景 → 打开目录 → 断言列表与场景库一致 + 类别覆盖 → 搜索断言（过滤 / 不可能命中 / 清空）→ 播放某条目并断言进度标记已看 → 重开目录断言进度持久 → 截图 3 张 → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -102,6 +103,31 @@ $env:GTSNPONDER_UI_AUTOTEST="editor"; .\gradlew.bat runClient  # 游戏内编辑
   断言文件为合法 v1 且步骤/旁白齐全 → 场景库热重载 → 断言重放的是 `source=hand` 手作场景且
   seek 到录制步骤时旁白键为录制键 → 截图。目标选 `gtceu:steam_grinder` 等（规避 `scene` 的焦炉目标，
   避免作者场景覆盖随包场景造成相互污染）。
+
+### JEI/EMI 入口 + 思索图鉴目录（#11）
+
+- **软依赖（dev-only 编译期）**：JEI `mezz.jei:jei-1.20.1-forge` 与 EMI `dev.emi:emi-forge` 以
+  `modCompileOnly { transitive = false }` 声明（**不进入运行时 classpath**），`mods.toml` 各加
+  `mandatory=false` + `versionRange="[0,)"` + `ordering="AFTER"` + `side="CLIENT"` 的 optional 块。
+  两者缺席时集成类（`GtJeiPlugin` / `GtEmiPlugin` 等）**永不加载**，目录 / 快捷键 / 注视入口照常工作
+  （零 `NoClassDefFoundError`；由无 JEI/EMI 的 `runClient` 自动测试与 `runGameTestServer` 自证）。
+- **入口机制（无 mixin）**：JEI 用官方 `IAdvancedRegistration.addRecipeCategoryDecorator(
+MultiblockInfoCategory.RECIPE_TYPE, …)` 在 GT 多方块信息页叠加「思索」按钮；因装饰器接口无输入钩子，
+  点击经 Forge `ScreenEvent.MouseButtonPressed.Pre`（`PonderXeiClientEvents`）命中按钮矩形并打开播放屏。
+  EMI 用官方 `EmiRegistry.addRecipeDecorator(MultiblockInfoEmiCategory.CATEGORY, …)` 注入一个自绘可点击
+  `Widget`（EMI 自行处理点击）。目标取自 GT 机器定义 id（`MultiblockInfoWrapper.definition` /
+  `MultiblockInfoEmiRecipe.getId()`）。点击解析缝合在纯 Java `PonderXeiEntry`（装饰器登记目标 + 按钮屏幕
+  矩形，点击处理器命中），由 `PonderXeiEntryTest` headless 锁定。**JEI/EMI 集成本工单为编译期覆盖
+  （代码评审）+ 点击解析单测**：dev 未加载 JEI/EMI，故不追加运行时自动测试。
+- **图鉴目录**：纯逻辑 `com.gtsn.ponder.catalog`（`SceneCatalog` / `SceneCategories` / `CatalogEntry` /
+  `WatchedProgress` / `ProgressStore`，零 MC）；屏幕 `SceneCatalogScreen`（GTSN UI）：类别栏
+  （`SceneCategories` 关键词派生：模块 / 概念 / 蒸汽 / 发电 / 物流 / 机器）+ 实时搜索 + 每场景已看 /
+  未看标记 + 「播放」。条目只收有 `target` 的场景（无目标无法从目录播放）；类别由目标 id 关键词派生
+  （v1 格式无类别字段，规则由 `SceneCategoriesTest` 锁定）。入口：快捷键 `key.gtsnponder.catalog`
+  （默认 O）、`/gtsnponder catalog`、`PonderEntrypoints.openCatalog()`。
+- **进度持久化**：`<gameDir>/gtsnponder-progress.json`（`ProgressStore.FILE_NAME`），规范化 JSON
+  `{"formatVersion":1,"watched":[…]}`；键取场景 `id`（无则 `target`）。在播放屏打开即标记已看（幂等，
+  `ScenePlayerScreen` 构造时写盘）；`PonderProgress`（客户端单例）读写，缺失 / 非法文件退化为空进度。
 
 ### 依赖与类加载纪律
 

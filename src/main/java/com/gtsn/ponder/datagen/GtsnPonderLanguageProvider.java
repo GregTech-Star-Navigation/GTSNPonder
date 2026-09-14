@@ -1,5 +1,7 @@
 package com.gtsn.ponder.datagen;
 
+import com.gtsn.ponder.catalog.CatalogKeys;
+import com.gtsn.ponder.catalog.SceneCategories;
 import com.gtsn.ponder.editor.EditorKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
@@ -45,6 +47,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         Map<String, String> keys = new LinkedHashMap<>();
         keys.put("key.categories.gtsnponder", "GTSN Ponder");
         keys.put("key.gtsnponder.ponder", "Open Ponder");
+        keys.put("key.gtsnponder.catalog", "Open Ponder Catalog");
 
         keys.put("ponder.gtsnponder.coke_oven.title", "Coke Oven");
         keys.put("ponder.gtsnponder.coke_oven.narration.intro",
@@ -88,6 +91,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.message.dump", "Generated scene written to %s");
         keys.put("ponder.gtsnponder.message.dump_failed", "Could not write the generated scene: %s");
         editorKeys(keys, false);
+        catalogKeys(keys, false);
         return keys;
     }
 
@@ -95,6 +99,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         Map<String, String> keys = new LinkedHashMap<>();
         keys.put("key.categories.gtsnponder", "格雷科技·思索");
         keys.put("key.gtsnponder.ponder", "打开思索");
+        keys.put("key.gtsnponder.catalog", "打开思索图鉴");
 
         keys.put("ponder.gtsnponder.coke_oven.title", "焦炉");
         keys.put("ponder.gtsnponder.coke_oven.narration.intro", "这是焦炉：一台 3×3×3 的多方块，把煤炭炼成焦炭。");
@@ -129,7 +134,53 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.message.dump", "已把生成场景写入 %s");
         keys.put("ponder.gtsnponder.message.dump_failed", "写入生成场景失败：%s");
         editorKeys(keys, true);
+        catalogKeys(keys, true);
         return keys;
+    }
+
+    /**
+     * 思索图鉴目录（#11）与 XEI（JEI/EMI）入口的界面键（中英双语）：标题 / 搜索 / 类别 / 观看标记 /
+     * 进度 / 空态 / 关闭 / XEI 按钮，以及全部类别显示名（{@link SceneCategories}）。键集中定义在
+     * {@link CatalogKeys}。
+     */
+    private static void catalogKeys(Map<String, String> keys, boolean chinese) {
+        if (chinese) {
+            keys.put(CatalogKeys.TITLE, "思索图鉴");
+            keys.put(CatalogKeys.SEARCH, "搜索");
+            keys.put(CatalogKeys.ALL, "全部");
+            keys.put(CatalogKeys.PLAY, "播放");
+            keys.put(CatalogKeys.WATCHED, "[已看]");
+            keys.put(CatalogKeys.UNWATCHED, "[未看]");
+            keys.put(CatalogKeys.PROGRESS, "已看 %s / %s");
+            keys.put(CatalogKeys.EMPTY, "没有匹配的思索场景。");
+            keys.put(CatalogKeys.CLOSE, "关闭");
+            keys.put(CatalogKeys.XEI_OPEN, "打开这台机器的思索教程");
+            keys.put(CatalogKeys.XEI_OPEN_SHORT, "思索");
+            keys.put(CatalogKeys.categoryKey(SceneCategories.MODULE), "模块系统");
+            keys.put(CatalogKeys.categoryKey(SceneCategories.CONCEPT), "概念");
+            keys.put(CatalogKeys.categoryKey(SceneCategories.STEAM), "蒸汽机器");
+            keys.put(CatalogKeys.categoryKey(SceneCategories.POWER), "发电与能量");
+            keys.put(CatalogKeys.categoryKey(SceneCategories.LOGISTICS), "物流与管网");
+            keys.put(CatalogKeys.categoryKey(SceneCategories.MACHINES), "机器");
+            return;
+        }
+        keys.put(CatalogKeys.TITLE, "Ponder Catalog");
+        keys.put(CatalogKeys.SEARCH, "Search");
+        keys.put(CatalogKeys.ALL, "All");
+        keys.put(CatalogKeys.PLAY, "Play");
+        keys.put(CatalogKeys.WATCHED, "[watched]");
+        keys.put(CatalogKeys.UNWATCHED, "[unwatched]");
+        keys.put(CatalogKeys.PROGRESS, "Watched %s / %s");
+        keys.put(CatalogKeys.EMPTY, "No ponder scene matches this filter.");
+        keys.put(CatalogKeys.CLOSE, "Close");
+        keys.put(CatalogKeys.XEI_OPEN, "Open this machine's ponder tutorial");
+        keys.put(CatalogKeys.XEI_OPEN_SHORT, "Ponder");
+        keys.put(CatalogKeys.categoryKey(SceneCategories.MODULE), "Module system");
+        keys.put(CatalogKeys.categoryKey(SceneCategories.CONCEPT), "Concepts");
+        keys.put(CatalogKeys.categoryKey(SceneCategories.STEAM), "Steam machines");
+        keys.put(CatalogKeys.categoryKey(SceneCategories.POWER), "Power & energy");
+        keys.put(CatalogKeys.categoryKey(SceneCategories.LOGISTICS), "Logistics & pipes");
+        keys.put(CatalogKeys.categoryKey(SceneCategories.MACHINES), "Machines");
     }
 
     /**

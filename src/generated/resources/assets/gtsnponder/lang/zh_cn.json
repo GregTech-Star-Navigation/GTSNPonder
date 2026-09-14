@@ -1,6 +1,22 @@
 {
   "key.categories.gtsnponder": "格雷科技·思索",
+  "key.gtsnponder.catalog": "打开思索图鉴",
   "key.gtsnponder.ponder": "打开思索",
+  "ponder.gtsnponder.catalog.all": "全部",
+  "ponder.gtsnponder.catalog.category.concept": "概念",
+  "ponder.gtsnponder.catalog.category.logistics": "物流与管网",
+  "ponder.gtsnponder.catalog.category.machines": "机器",
+  "ponder.gtsnponder.catalog.category.module": "模块系统",
+  "ponder.gtsnponder.catalog.category.power": "发电与能量",
+  "ponder.gtsnponder.catalog.category.steam": "蒸汽机器",
+  "ponder.gtsnponder.catalog.close": "关闭",
+  "ponder.gtsnponder.catalog.empty": "没有匹配的思索场景。",
+  "ponder.gtsnponder.catalog.play": "播放",
+  "ponder.gtsnponder.catalog.progress": "已看 %s / %s",
+  "ponder.gtsnponder.catalog.search": "搜索",
+  "ponder.gtsnponder.catalog.title": "思索图鉴",
+  "ponder.gtsnponder.catalog.unwatched": "[未看]",
+  "ponder.gtsnponder.catalog.watched": "[已看]",
   "ponder.gtsnponder.coke_oven.narration.controller": "控制器位于正面中央，通电后多方块即成型。",
   "ponder.gtsnponder.coke_oven.narration.intro": "这是焦炉：一台 3×3×3 的多方块，把煤炭炼成焦炭。",
   "ponder.gtsnponder.coke_oven.narration.usage": "从顶部输入煤炭，再从输出仓口取出焦炭与杂酚油。",
@@ -133,5 +149,7 @@
   "ponder.gtsnponder.message.no_target": "视线内没有格雷科技机器 / 多方块（需在触及范围内）。",
   "ponder.gtsnponder.message.no_world": "请先进入世界再打开思索。",
   "ponder.gtsnponder.player.seekhint": "点击进度条跳转",
-  "ponder.gtsnponder.player.title": "思索"
+  "ponder.gtsnponder.player.title": "思索",
+  "ponder.gtsnponder.xei.open": "打开这台机器的思索教程",
+  "ponder.gtsnponder.xei.open.short": "思索"
 }

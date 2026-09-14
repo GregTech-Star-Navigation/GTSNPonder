@@ -34,6 +34,9 @@ repositories {
     maven { url = "https://maven.gtceu.com" }
     maven { url = "https://maven.firstdark.dev/snapshots/" }
     maven { url = "https://maven.tterrag.com/" }
+    // 软依赖（#11）的发布源：JEI 走 BlameJared maven，EMI 走 Terraformers maven。
+    maven { url = "https://maven.blamejared.com" }
+    maven { url = "https://maven.terraformersmc.com/releases/" }
 }
 
 java {
@@ -56,6 +59,12 @@ dependencies {
     modImplementation("com.lowdragmc.ldlib:ldlib-forge-1.20.1:${forge.versions.ldlib.get()}") { transitive = false }
     modImplementation("com.tterrag.registrate:Registrate:${forge.versions.registrate.get()}")
     modImplementation("dev.toma.configuration:configuration-forge-1.20.1:${forge.versions.configuration.get()}") { transitive = false }
+
+    // 软依赖（#11）：JEI / EMI 的 dev-only 编译期依赖。仅 modCompileOnly —— 不进入运行时
+    // classpath，故 JEI / EMI 缺席时集成类永不加载（零 NoClassDefFoundError，功能降级）；
+    // 由 mods.toml 的 optional 块声明运行时软依赖。transitive=false：不拉取它们的传递依赖。
+    modCompileOnly("mezz.jei:jei-1.20.1-forge:${forge.versions.jei.get()}") { transitive = false }
+    modCompileOnly("dev.emi:emi-forge:${forge.versions.emi.get()}") { transitive = false }
 }
 
 test {

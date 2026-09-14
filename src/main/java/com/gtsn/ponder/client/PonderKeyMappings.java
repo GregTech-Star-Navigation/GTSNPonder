@@ -20,5 +20,6 @@ public final class PonderKeyMappings {
     @SubscribeEvent
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(PonderEntrypoints.PONDER_KEY);
+        event.register(PonderEntrypoints.CATALOG_KEY);
     }
 }

@@ -45,6 +45,11 @@ public final class PonderEntrypoints {
             "key.gtsnponder.ponder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
             "key.categories.gtsnponder");
 
+    /** 思索图鉴目录快捷键（默认 O；冲突时玩家可自行改绑）。 */
+    public static final KeyMapping CATALOG_KEY = new KeyMapping(
+            "key.gtsnponder.catalog", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O,
+            "key.categories.gtsnponder");
+
     /** 注视判定距离（格）。 */
     public static final double REACH = 5.0d;
 
@@ -105,6 +110,16 @@ public final class PonderEntrypoints {
         final StructureSource sourceToOpen = source;
         minecraft.execute(() -> minecraft.setScreen(
                 new ScenePlayerScreen(sceneToOpen, sourceToOpen, minecraft.level)));
+        return true;
+    }
+
+    /**
+     * 图鉴目录入口（③ 目录入口 / 快捷键 / 客户端命令 / 自动测试）：打开 {@link SceneCatalogScreen}，
+     * 列出场景库全部可播放场景，支持分类浏览、搜索与已看 / 未看进度。
+     */
+    public static boolean openCatalog() {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.execute(() -> minecraft.setScreen(new SceneCatalogScreen(SceneLibrary.get().scenes())));
         return true;
     }
 

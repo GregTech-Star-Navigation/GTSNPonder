@@ -1,6 +1,22 @@
 {
   "key.categories.gtsnponder": "GTSN Ponder",
+  "key.gtsnponder.catalog": "Open Ponder Catalog",
   "key.gtsnponder.ponder": "Open Ponder",
+  "ponder.gtsnponder.catalog.all": "All",
+  "ponder.gtsnponder.catalog.category.concept": "Concepts",
+  "ponder.gtsnponder.catalog.category.logistics": "Logistics & pipes",
+  "ponder.gtsnponder.catalog.category.machines": "Machines",
+  "ponder.gtsnponder.catalog.category.module": "Module system",
+  "ponder.gtsnponder.catalog.category.power": "Power & energy",
+  "ponder.gtsnponder.catalog.category.steam": "Steam machines",
+  "ponder.gtsnponder.catalog.close": "Close",
+  "ponder.gtsnponder.catalog.empty": "No ponder scene matches this filter.",
+  "ponder.gtsnponder.catalog.play": "Play",
+  "ponder.gtsnponder.catalog.progress": "Watched %s / %s",
+  "ponder.gtsnponder.catalog.search": "Search",
+  "ponder.gtsnponder.catalog.title": "Ponder Catalog",
+  "ponder.gtsnponder.catalog.unwatched": "[unwatched]",
+  "ponder.gtsnponder.catalog.watched": "[watched]",
   "ponder.gtsnponder.coke_oven.narration.controller": "The controller sits in the front-center. Power it to form the structure.",
   "ponder.gtsnponder.coke_oven.narration.intro": "This is the coke oven: a 3x3x3 multiblock that turns coal into coke.",
   "ponder.gtsnponder.coke_oven.narration.usage": "Feed coal from the top, then collect coke and creosote from the output hatch.",
@@ -133,5 +149,7 @@
   "ponder.gtsnponder.message.no_target": "No GT machine or multiblock in view (within reach).",
   "ponder.gtsnponder.message.no_world": "Join a world before opening ponder.",
   "ponder.gtsnponder.player.seekhint": "Click the bar to seek",
-  "ponder.gtsnponder.player.title": "Ponder"
+  "ponder.gtsnponder.player.title": "Ponder",
+  "ponder.gtsnponder.xei.open": "Open this machine's ponder tutorial",
+  "ponder.gtsnponder.xei.open.short": "Ponder"
 }

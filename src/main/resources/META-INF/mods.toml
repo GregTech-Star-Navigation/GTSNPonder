@@ -55,3 +55,19 @@ mandatory=true
 versionRange="[2.2.0,)"
 ordering="AFTER"
 side="BOTH"
+
+# --- Optional soft dependencies (JEI / EMI entry points) ---
+# 缺席时功能优雅降级（JEI/EMI 机器页按钮不出现），绝不 NoClassDefFoundError。
+[[dependencies.gtsnponder]]
+modId="jei"
+mandatory=false
+versionRange="[0,)"
+ordering="AFTER"
+side="CLIENT"
+
+[[dependencies.gtsnponder]]
+modId="emi"
+mandatory=false
+versionRange="[0,)"
+ordering="AFTER"
+side="CLIENT"

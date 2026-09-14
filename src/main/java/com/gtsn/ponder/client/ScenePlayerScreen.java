@@ -88,6 +88,8 @@ public final class ScenePlayerScreen extends GtsnScreen {
         this.bridge = new DummySceneWorld(structure, scene, viewport);
         this.playback = ScenePlayback.of(scene, bridge);
         this.metrics = new ThemeFontMetrics(Minecraft.getInstance().font);
+        // 打开播放屏即视为「已看」：图鉴目录据此渲染进度（幂等、随即持久化）。
+        PonderProgress.get().markWatched(scene);
 
         PanelWidget root = root();
         root.node().params().padding(Insets.all(SCREEN_PADDING)).gap(6);
