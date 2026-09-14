@@ -1,8 +1,9 @@
 package com.gtsn.ponder.catalog;
 
 /**
- * 思索图鉴目录（#11）与 JEI/EMI 入口所用的<b>本地化键</b>（单一事实源）：目录标题 / 搜索 / 类别 /
- * 进度 / 观看标记 / 空态 / 关闭，以及 XEI「思索」按钮文案。供目录屏幕与 datagen 的 lang provider 共用
+ * 思索图鉴目录（#11）与 JEI/EMI、GT 机器界面覆盖层入口所用的<b>本地化键</b>（单一事实源）：
+ * 目录标题 / 搜索 / 类别 / 进度 / 观看标记 / 空态 / 关闭，以及 XEI「思索」按钮与 GT 机器界面
+ * 覆盖层「思索」按钮（#12，入口 ④）文案。供目录屏幕、覆盖层与 datagen 的 lang provider 共用
  * （全部文案走本地化键，中英双语）。
  *
  * <p>纯 Java、零 MC 依赖。</p>
@@ -35,6 +36,11 @@ public final class CatalogKeys {
     public static final String XEI_OPEN = "ponder.gtsnponder.xei.open";
     /** XEI 机器页「思索」按钮的短标签。 */
     public static final String XEI_OPEN_SHORT = "ponder.gtsnponder.xei.open.short";
+
+    /** GT 机器界面覆盖层「思索」按钮的悬浮提示（入口 ④，#12）。 */
+    public static final String GT_MACHINE_OPEN = "ponder.gtsnponder.gt.open";
+    /** GT 机器界面覆盖层「思索」按钮的短标签（按钮文字）。 */
+    public static final String GT_MACHINE_OPEN_SHORT = "ponder.gtsnponder.gt.open.short";
 
     /** 类别显示名键前缀（{@code ...category.<key>}）。 */
     public static final String CATEGORY_PREFIX = "ponder.gtsnponder.catalog.category.";

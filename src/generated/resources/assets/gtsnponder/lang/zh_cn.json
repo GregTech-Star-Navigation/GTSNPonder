@@ -140,6 +140,8 @@
   "ponder.gtsnponder.generated.narration.intro": "这是 %s，一台 %s 的多方块。看看方块如何拼合。",
   "ponder.gtsnponder.generated.narration.modules": "%s 个模块位——在此安装匹配的模块。",
   "ponder.gtsnponder.generated.narration.modules.none": "该结构未声明模块位。",
+  "ponder.gtsnponder.gt.open": "打开这台机器的思索教程",
+  "ponder.gtsnponder.gt.open.short": "思索",
   "ponder.gtsnponder.legend.controller": "控制器（金色）",
   "ponder.gtsnponder.legend.hatch": "仓口 / 总线（蓝色）",
   "ponder.gtsnponder.legend.title": "图例",

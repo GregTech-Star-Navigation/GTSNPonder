@@ -80,7 +80,7 @@ GTSNPonder：**GTSN 体系内的独立附属 mod**，为 GT 的机器、多方�
 UI / 入口：
 
 - 全部界面基于 GTSN UI（外壳与场景页统一）；视口经 `SceneViewport` 嵌入。
-- 入口：① 注视方块 + 快捷键；② JEI/EMI 机器页按钮；③ 思索图鉴 / 目录；④ GT 机器界面按钮（**对 GTSNLib ADR-0004 的受控例外**，最后阶段评估；经 fork 侧版本化 hook 实现，绝不把内容挂进 GT 的 UI 树）。
+- 入口：① 注视方块 + 快捷键；② JEI/EMI 机器页按钮；③ 思索图鉴 / 目录；④ GT 机器界面按钮（**对 GTSNLib ADR-0004 的受控例外**，最后阶段评估；以**客户端覆盖层**实现——经 Forge `ScreenEvent` 在 GT 机器屏之上自绘按钮，绝不把内容挂进 / 改动 GT 的 UI 树，不用 mixin、不改 GT fork；见 ADR-0005）。
 
 适配与纪律：
 
@@ -108,7 +108,7 @@ UI / 入口：
 
 ## Out of Scope
 
-- 不接管 / 替换 GT 原生机器界面（唯一例外：入口按钮，最后阶段单独评估）。
+- 不接管 / 替换 GT 原生机器界面（唯一例外：入口按钮，最后阶段单独评估；以客户端覆盖层实现，不改 GT 的 UI 树，见 ADR-0005）。
 - 不依赖 Create / 独立 Ponder 库 / Flywheel（运行时零额外依赖）。
 - 不以 LDLib `CompassScene` 作为引擎骨架。
 - 不含第三方附属 mod（如 GTOCore 等）内容；覆盖边界为本体 GT（含组织 fork）。

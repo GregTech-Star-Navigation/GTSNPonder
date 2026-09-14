@@ -41,6 +41,7 @@ $env:GTSNPONDER_UI_AUTOTEST="scene"; .\gradlew.bat runClient  # 场景播放自�
 $env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成自动测试（#7）：载入存档 → 解析小/中/大三台真实 GT 多方块 → 强制自动生成并播放 → 确定性断言 → 每台两张截图 run/screenshots/gtsnponder-autogen-<n>-<machine>-reveal.png 与 -formed.png（揭示中 / 成型）→ 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="editor"; .\gradlew.bat runClient  # 游戏内编辑器自动测试（#9）：载入存档 → 打开编辑器 → 录制 2 步 + 微调时长 → 保存 → 场景库热重载 → 重放并断言编辑后的旁白 → 截图 run/screenshots/gtsnponder-editor.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="catalog"; .\gradlew.bat runClient  # 图鉴目录自动测试（#11）：载入存档 → 清空进度并按需补种子作者场景 → 打开目录 → 断言列表与场景库一致 + 类别覆盖 → 搜索断言（过滤 / 不可能命中 / 清空）→ 播放某条目并断言进度标记已看 → 重开目录断言进度持久 → 截图 3 张 → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="gtgui"; .\gradlew.bat runClient  # GT 机器界面覆盖按钮自动测试（#12，入口 ④）：载入存档 → 放置真实 gtceu:coke_oven 多方块并以 GT 标准路径打开其 GUI → 断言覆盖按钮出现在真实 GT 机器屏上且目标正确 → 经事件总线投递 MouseButtonPressed.Pre 断言点击打开该目标的播放屏 → 断言非 GT 屏不出现 → 截图 run/screenshots/gtsnponder-gtgui{,-player,-nongt}.png → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -128,6 +129,24 @@ MultiblockInfoCategory.RECIPE_TYPE, …)` 在 GT 多方块信息页叠加「思�
 - **进度持久化**：`<gameDir>/gtsnponder-progress.json`（`ProgressStore.FILE_NAME`），规范化 JSON
   `{"formatVersion":1,"watched":[…]}`；键取场景 `id`（无则 `target`）。在播放屏打开即标记已看（幂等，
   `ScenePlayerScreen` 构造时写盘）；`PonderProgress`（客户端单例）读写，缺失 / 非法文件退化为空进度。
+
+### GT 机器界面入口按钮（#12，覆盖层）
+
+- **方案（用户批准，偏离原 AC）**：GT 机器界面内「思索」按钮以**客户端覆盖层**实现——经 Forge
+  `ScreenEvent`（`Render.Post` 自绘 / `MouseButtonPressed.Pre` / `KeyPressed.Pre` 处理 / `Opening` 清理）
+  在 GT 机器屏**之上**自绘按钮；**不改 GT fork、不用 mixin、不动 GT 的 UI 树**。ADR-0005 记录该例外与
+  「fork 侧 hook」原 AC 的作废。
+- **识别与目标解析（GT 侧，唯一适配包）**：`com.gtsn.ponder.gt.GtMachineScreenAdapter`——GT 机器屏 =
+  LDLib `ModularUIGuiContainer` 且 `modularUI.holder` 为 `MetaMachine`；若机器定义是
+  `MultiblockMachineDefinition` 则返回其 id 作为思索目标（如 `gtceu:coke_oven`）。非 GT 屏 / 非多方块
+  返回空（no-op，不绘制、不消费输入）。
+- **覆盖层（客户端，零 MC 纯逻辑 + 事件接线）**：纯几何 / 点击交接 `MachinePonderButton` +
+  `MachinePonderOverlay`（headless 单测锁定），事件接线 `GtMachineOverlayClientEvents`；按钮文案键
+  `CatalogKeys.GT_MACHINE_OPEN{,_SHORT}`（datagen 产出中英）；点击走 `PonderEntrypoints.openForTarget`。
+- **自动测试**：`GTSNPONDER_UI_AUTOTEST=gtgui`（见上）。GT 侧探针 `com.gtsn.ponder.gt.GtMachineUiProbe`
+  在开发世界放置机器并经 `MachineUIFactory.openUI` 打开真实 GUI；覆盖层识别 / 绘制由真实渲染循环驱动，
+  点击由 `MinecraftForge.EVENT_BUS.post(new ScreenEvent.MouseButtonPressed.Pre(...))` 投递（与生产
+  `MouseHandler` 同型事件）。
 
 ### 依赖与类加载纪律
 

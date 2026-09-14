@@ -140,6 +140,8 @@
   "ponder.gtsnponder.generated.narration.intro": "This is %s, a %s multiblock. Watch how the blocks come together.",
   "ponder.gtsnponder.generated.narration.modules": "%s module slot(s) - install matching modules here.",
   "ponder.gtsnponder.generated.narration.modules.none": "This structure declares no module slots.",
+  "ponder.gtsnponder.gt.open": "Open this machine's ponder tutorial",
+  "ponder.gtsnponder.gt.open.short": "Ponder",
   "ponder.gtsnponder.legend.controller": "Controller (gold)",
   "ponder.gtsnponder.legend.hatch": "Hatch / bus (blue)",
   "ponder.gtsnponder.legend.title": "Legend",

@@ -156,6 +156,8 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
             keys.put(CatalogKeys.CLOSE, "关闭");
             keys.put(CatalogKeys.XEI_OPEN, "打开这台机器的思索教程");
             keys.put(CatalogKeys.XEI_OPEN_SHORT, "思索");
+            keys.put(CatalogKeys.GT_MACHINE_OPEN, "打开这台机器的思索教程");
+            keys.put(CatalogKeys.GT_MACHINE_OPEN_SHORT, "思索");
             keys.put(CatalogKeys.categoryKey(SceneCategories.MODULE), "模块系统");
             keys.put(CatalogKeys.categoryKey(SceneCategories.CONCEPT), "概念");
             keys.put(CatalogKeys.categoryKey(SceneCategories.STEAM), "蒸汽机器");
@@ -175,6 +177,8 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(CatalogKeys.CLOSE, "Close");
         keys.put(CatalogKeys.XEI_OPEN, "Open this machine's ponder tutorial");
         keys.put(CatalogKeys.XEI_OPEN_SHORT, "Ponder");
+        keys.put(CatalogKeys.GT_MACHINE_OPEN, "Open this machine's ponder tutorial");
+        keys.put(CatalogKeys.GT_MACHINE_OPEN_SHORT, "Ponder");
         keys.put(CatalogKeys.categoryKey(SceneCategories.MODULE), "Module system");
         keys.put(CatalogKeys.categoryKey(SceneCategories.CONCEPT), "Concepts");
         keys.put(CatalogKeys.categoryKey(SceneCategories.STEAM), "Steam machines");

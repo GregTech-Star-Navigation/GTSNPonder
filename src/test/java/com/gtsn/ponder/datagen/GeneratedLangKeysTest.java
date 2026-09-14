@@ -45,6 +45,11 @@ class GeneratedLangKeysTest {
             GeneratedKeys.LEGEND_CONTROLLER,
             GeneratedKeys.LEGEND_HATCH);
 
+    /** GT 机器界面覆盖层入口（#12）的按钮文案键，须经 datagen 产出中英双语。 */
+    private static final List<String> GT_MACHINE_OVERLAY_KEYS = List.of(
+            com.gtsn.ponder.catalog.CatalogKeys.GT_MACHINE_OPEN,
+            com.gtsn.ponder.catalog.CatalogKeys.GT_MACHINE_OPEN_SHORT);
+
     private static JsonObject read(Path path, String locale) throws IOException {
         assertTrue(Files.isRegularFile(path),
                 "generated lang file missing for " + locale + " (run .\\gradlew.bat --offline runData): " + path);
@@ -68,6 +73,18 @@ class GeneratedLangKeysTest {
                 .entrySet()) {
             for (String key : LEGEND_KEYS) {
                 assertTrue(locale.getValue().has(key), locale.getKey() + " is missing legend key " + key);
+            }
+        }
+    }
+
+    @Test
+    void bothLocalesCoverGtMachineOverlayKeys() throws IOException {
+        for (Map.Entry<String, JsonObject> locale : Map.of("en_us", read(EN, "en_us"), "zh_cn", read(ZH, "zh_cn"))
+                .entrySet()) {
+            for (String key : GT_MACHINE_OVERLAY_KEYS) {
+                assertTrue(locale.getValue().has(key),
+                        locale.getKey() + " is missing GT machine overlay key " + key);
+                assertFalse(locale.getValue().get(key).getAsString().isBlank(), key);
             }
         }
     }
