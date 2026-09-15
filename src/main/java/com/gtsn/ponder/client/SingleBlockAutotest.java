@@ -5,10 +5,13 @@ import com.gtsn.ponder.catalog.CatalogEntry;
 import com.gtsn.ponder.catalog.SceneCatalog;
 import com.gtsn.ponder.catalog.SingleBlockScenes;
 import com.gtsn.ponder.engine.model.SceneData;
+import com.gtsn.ponder.engine.model.SceneStep;
 import com.gtsn.ponder.engine.model.Source;
+import com.gtsn.ponder.generate.MachineDescriptions;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import com.gtsn.ponder.gt.GtMachineScreenAdapter;
 import com.gtsn.ponder.gt.GtMachineUiProbe;
+import com.gtsn.ponder.presenter.NarrationLocalization;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -16,6 +19,7 @@ import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.locale.Language;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
@@ -418,6 +422,9 @@ public final class SingleBlockAutotest {
             fail(minecraft, GENERATED_TARGET + " usage scene id mismatch: " + generated.get().id());
             return;
         }
+        if (!assertUsageTeaching(minecraft, generated.get())) {
+            return;
+        }
         if (!PonderEntrypoints.openForTarget(GENERATED_TARGET)) {
             fail(minecraft, "could not open the generated usage scene for " + GENERATED_TARGET);
             return;
@@ -426,6 +433,59 @@ public final class SingleBlockAutotest {
                 GENERATED_TARGET, generated.get().steps().size(), generated.get().source());
         stage = Stage.GRAB;
         ticks = 0;
+    }
+
+    /**
+     * 工单 #18 的 FAIL-ABLE 断言：生成的单方块使用场景旁白必须是「分步教学」——固定顺序
+     * 用途 → 本体 → 输入 → 输出 → 供能 → 常见坑，关键机器命中<b>手写</b>解说键，且渲染后不露出原始
+     * {@code gtceu:} 注册名。失败即记录 FAIL 并截图退出。
+     */
+    private static boolean assertUsageTeaching(Minecraft minecraft, SceneData scene) {
+        if (!MachineDescriptions.isCurated(scene.target())) {
+            fail(minecraft, scene.target() + " must be a curated single-block machine for this assertion");
+            return false;
+        }
+        List<String> ids = scene.steps().stream().map(SceneStep::id).toList();
+        int purpose = ids.indexOf("text.purpose");
+        int setup = ids.indexOf("text.setup");
+        int inputs = ids.indexOf("text.inputs");
+        int outputs = ids.indexOf("text.outputs");
+        int energy = ids.indexOf("text.energy");
+        int pitfalls = ids.indexOf("text.pitfalls");
+        if (purpose < 0 || setup < 0 || inputs < 0 || outputs < 0 || energy < 0 || pitfalls < 0
+                || !(purpose < setup && setup < inputs && inputs < outputs && outputs < energy
+                        && energy < pitfalls)) {
+            fail(minecraft, scene.target() + " usage teaching steps are missing or out of order: " + ids);
+            return false;
+        }
+        String curatedPurpose = MachineDescriptions.key(scene.target(), MachineDescriptions.Field.PURPOSE);
+        if (!curatedPurpose.equals(scene.steps().get(purpose).narration())) {
+            fail(minecraft, scene.target() + " purpose must use the hand-written key, got "
+                    + scene.steps().get(purpose).narration());
+            return false;
+        }
+        for (SceneStep step : scene.steps()) {
+            if (step.narration() == null) {
+                continue;
+            }
+            if (!Language.getInstance().has(step.narration())) {
+                fail(minecraft, scene.target() + " narration key is not localized: " + step.narration());
+                return false;
+            }
+            for (List<NarrationLocalization.Part> arg : NarrationLocalization.resolveArgs(
+                    step.narrationArgs(), Language.getInstance()::has)) {
+                for (NarrationLocalization.Part part : arg) {
+                    if (!part.translatable() && part.value().contains(":")) {
+                        fail(minecraft, scene.target() + " narration leaks a raw token '" + part.value()
+                                + "' at step " + step.id());
+                        return false;
+                    }
+                }
+            }
+        }
+        LOGGER.info("[GTSNPonder] singleblock autotest: curated usage teaching narration verified for {} "
+                + "({} steps)", scene.target(), ids.size());
+        return true;
     }
 
     private static void tickGrab(Minecraft minecraft) {

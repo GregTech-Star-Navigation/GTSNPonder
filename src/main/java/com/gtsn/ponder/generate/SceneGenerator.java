@@ -29,6 +29,21 @@ import java.util.TreeSet;
  * 使用流程与原理必须手作。产物携带 {@code source=auto} 与 {@link #GENERATOR_VERSION}，是可重生成
  * 的构建产物；手作以场景粒度覆盖。</p>
  *
+ * <h2>分步教学模式（工单 #18）</h2>
+ * <p>旁白不再是「本机 N 个仓口／总线（枚举列表）」式的机械罗列，而是按<b>固定教学顺序</b>分步，
+ * 每步一句完整人话：</p>
+ * <ol>
+ *   <li><b>用途</b>（{@link #NARRATION_PURPOSE}）：这是什么机器；关键机器命中手写解说
+ *       （{@link MachineDescriptions}）；</li>
+ *   <li><b>怎么搭 / 成型要点</b>（{@link #NARRATION_SETUP}）：控制器与成型条件；</li>
+ *   <li><b>输入什么</b>（{@link #NARRATION_INPUTS}）：原料从哪些接口进入（自然表述，不堆砌计数）；</li>
+ *   <li><b>输出什么</b>（{@link #NARRATION_OUTPUTS}）：产物从哪些接口取出；</li>
+ *   <li><b>供能与层级</b>（{@link #NARRATION_ENERGY}）：怎么供电；</li>
+ *   <li><b>常见坑</b>（{@link #NARRATION_PITFALLS}）：过压、堵塞、维护等注意事项。</li>
+ * </ol>
+ * <p>仓口 / 总线的<b>角色</b>信息保留，但以自然语句嵌入输入 / 输出 / 供能 / 坑各步（角色名经 datagen
+ * 本地化），不再单独用「数量 + 括号枚举」当主内容。</p>
+ *
  * <h2>构建顺序与单元格预算</h2>
  * <p>默认<b>逐层</b>（Y 升序）揭示；非空方块数超过 {@link #CELL_BUDGET} 的超大机器切换为
  * <b>按角色分组 + LOD / 淡入</b>（每角色一个 {@code showSection}，{@code lod=grouped} /
@@ -49,9 +64,8 @@ import java.util.TreeSet;
  * <b>均匀抽样</b>（{@code spread}）避免代表位置彼此相邻导致轮廓重叠。</p>
  *
  * <h2>机器特定旁白</h2>
- * <p>旁白键携带 {@link SceneStep#narrationArgs() 模板参数}（机器名 / 标识 / 结构尺寸 / 仓口数量与
- * 角色 / 模块位数量），同一模板产出机器特定文案；<b>成型旁白同样机器特定</b>（标识 / 尺寸 /
- * 仓口数量与角色 / 模块位数量）。场景 {@code title} 亦为本地化键（{@link GeneratedKeys#machineTitleKey}），
+ * <p>旁白键携带 {@link SceneStep#narrationArgs() 模板参数}（机器名 / 标识 / 结构尺寸 / 仓口角色），
+ * 同一模板产出机器特定文案；场景 {@code title} 亦为本地化键（{@link GeneratedKeys#machineTitleKey}），
  * 与自动文案一起经 datagen 批量产出中英键（见 {@code com.gtsn.ponder.datagen}）。</p>
  *
  * <h2>成型演示</h2>
@@ -72,7 +86,7 @@ public final class SceneGenerator {
     public static final int CELL_BUDGET = 64;
 
     /** 生成器版本：产物可重生成 / 可 diff 的标识（写入 {@code generatorVersion}）。 */
-    public static final String GENERATOR_VERSION = "auto-1";
+    public static final String GENERATOR_VERSION = "auto-2";
 
     /** 自动生成场景 id 前缀（后缀为清洗后的目标 id）；目录 / 进度键与产物 id 共用此推导。 */
     public static final String SCENE_ID_PREFIX = "gtsnponder:auto_";
@@ -103,13 +117,26 @@ public final class SceneGenerator {
      */
     public static final String GENERIC_MODULE_ID = "gtsnponder:generic_module";
 
-    /** 旁白键（自动文案经 datagen 批量产出，见规格 §本地化）。参数见各步骤 narrationArgs。 */
-    public static final String NARRATION_INTRO = "ponder.gtsnponder.generated.narration.intro";
-    public static final String NARRATION_CONTROLLER = "ponder.gtsnponder.generated.narration.controller";
-    public static final String NARRATION_CONTROLLER_NONE =
-            "ponder.gtsnponder.generated.narration.controller.none";
-    public static final String NARRATION_HATCHES = "ponder.gtsnponder.generated.narration.hatches";
-    public static final String NARRATION_HATCHES_NONE = "ponder.gtsnponder.generated.narration.hatches.none";
+    /**
+     * 分步教学模式：用途 / 搭建 / 输入 / 输出 / 供能 / 常见坑（工单 #18）。参数见各步骤 narrationArgs。
+     */
+    public static final String NARRATION_PURPOSE = "ponder.gtsnponder.generated.narration.purpose";
+    public static final String NARRATION_SETUP = "ponder.gtsnponder.generated.narration.setup";
+    public static final String NARRATION_SETUP_NONE = "ponder.gtsnponder.generated.narration.setup.none";
+    public static final String NARRATION_INPUTS = "ponder.gtsnponder.generated.narration.inputs";
+    public static final String NARRATION_INPUTS_NONE = "ponder.gtsnponder.generated.narration.inputs.none";
+    public static final String NARRATION_OUTPUTS = "ponder.gtsnponder.generated.narration.outputs";
+    public static final String NARRATION_OUTPUTS_NONE = "ponder.gtsnponder.generated.narration.outputs.none";
+    public static final String NARRATION_ENERGY = "ponder.gtsnponder.generated.narration.energy";
+    public static final String NARRATION_ENERGY_NONE = "ponder.gtsnponder.generated.narration.energy.none";
+    /** 发电机（只有能量输出仓）的供能叙述：它把电力送出去，而不是取电。 */
+    public static final String NARRATION_ENERGY_OUTPUT = "ponder.gtsnponder.generated.narration.energy.output";
+    public static final String NARRATION_PITFALLS = "ponder.gtsnponder.generated.narration.pitfalls";
+    public static final String NARRATION_PITFALLS_NONE = "ponder.gtsnponder.generated.narration.pitfalls.none";
+    /** 成型旁白（参数：机器标识 / 结构尺寸）：一句完整的「这就是它运转时的样子」。 */
+    public static final String NARRATION_FORMED = "ponder.gtsnponder.generated.narration.formed";
+
+    /** 模块系统旁白（模块位计数 / 每槽可接受模块 / 安装效果汇总）。 */
     public static final String NARRATION_MODULES = "ponder.gtsnponder.generated.narration.modules";
     public static final String NARRATION_MODULES_NONE = "ponder.gtsnponder.generated.narration.modules.none";
     /** 单个模块位叙述（参数：槽号 / 可接受模块列表）。 */
@@ -129,18 +156,31 @@ public final class SceneGenerator {
     /** 无配方效果的安装叙述（参数：模块 id / 槽号）。 */
     public static final String NARRATION_MODULE_INSTALLED_NO_EFFECT =
             "ponder.gtsnponder.generated.narration.module.installed.none";
-    public static final String NARRATION_FORMED = "ponder.gtsnponder.generated.narration.formed";
 
-    private static final int INTRO_TEXT_DURATION = 45;
+    /**
+     * 教学顺序里的仓口 / 总线分组（按功能）：输入 / 输出 / 供能 / 辅助。角色名经 datagen 本地化后
+     * 自然嵌入对应句子。{@code PASSTHROUGH} 归输入（物料可双向通过），{@code OTHER_HATCH} 与
+     * 消声 / 维护归辅助（常见坑里提示「保持就绪」）。
+     */
+    private static final List<StructureRole> INPUT_ROLES =
+            List.of(StructureRole.ITEM_INPUT, StructureRole.FLUID_INPUT, StructureRole.PASSTHROUGH);
+    private static final List<StructureRole> OUTPUT_ROLES =
+            List.of(StructureRole.ITEM_OUTPUT, StructureRole.FLUID_OUTPUT);
+    private static final List<StructureRole> ENERGY_ROLES =
+            List.of(StructureRole.ENERGY_INPUT, StructureRole.ENERGY_OUTPUT);
+    private static final List<StructureRole> AUX_ROLES =
+            List.of(StructureRole.MUFFLER, StructureRole.MAINTENANCE, StructureRole.OTHER_HATCH);
+
+    private static final int PURPOSE_TEXT_DURATION = 50;
     private static final int LAYER_SECTION_DURATION = 12;
     private static final int ROLE_SECTION_DURATION = 18;
     private static final int HIGHLIGHT_DURATION = 25;
     private static final int OUTLINE_DURATION = 20;
-    private static final int TEXT_DURATION = 45;
+    private static final int TEXT_DURATION = 50;
     private static final int FORMED_HIDE_DURATION = 15;
     private static final int FORMED_SHOW_DURATION = 15;
     private static final int FORMED_PULSE_DURATION = 20;
-    private static final int FORMED_TEXT_DURATION = 40;
+    private static final int FORMED_TEXT_DURATION = 45;
 
     /**
      * 取景自适应目标填充比例（视口窄轴的占比）：相机步骤写出 {@code fit=true, margin=FIT_MARGIN}，
@@ -177,8 +217,8 @@ public final class SceneGenerator {
         List<SceneStep> steps = new ArrayList<>();
         List<String> buildSectionIds = new ArrayList<>();
 
-        steps.add(text("intro", NARRATION_INTRO, INTRO_TEXT_DURATION,
-                List.of(source.id(), sizeText(source))));
+        // ① 用途（手写优先，否则结构化模板）。
+        steps.add(purposeNarration(source));
 
         if (source.hasController()) {
             elements.add(SceneElement.of(ELEMENT_CONTROLLER, "anchor", Map.of("selector", "controller")));
@@ -193,8 +233,12 @@ public final class SceneGenerator {
             }
         }
 
+        // ② 怎么搭 / 成型要点：控制器高亮 + 成型条件叙述。
         appendControllerHighlight(source, steps);
-        appendHatchHighlight(source, elements, steps);
+
+        // ③④⑤⑥ 输入 / 输出 / 供能 / 常见坑：仓口按功能分批高亮并自然叙述。
+        appendHatchTeaching(source, elements, steps);
+
         appendModuleDemonstration(source, elements, steps);
         appendFormedDemonstration(source, steps, buildSectionIds);
 
@@ -259,6 +303,7 @@ public final class SceneGenerator {
         }
     }
 
+    /** 控制器高亮 + 成型要点叙述（无控制器时仍讲一句「没有控制器，摆齐即可」）。 */
     private static void appendControllerHighlight(StructureSource source, List<SceneStep> steps) {
         if (source.hasController()) {
             steps.add(SceneStep.builder()
@@ -268,31 +313,48 @@ public final class SceneGenerator {
                     .targets(List.of(ELEMENT_CONTROLLER))
                     .param("visible", Boolean.TRUE)
                     .build());
-            steps.add(text("text.controller", NARRATION_CONTROLLER, TEXT_DURATION,
-                    List.of(positionText(source))));
-        } else {
-            steps.add(text("text.controller", NARRATION_CONTROLLER_NONE, TEXT_DURATION, List.of()));
         }
+        steps.add(setupNarration(source));
     }
 
     /**
-     * 仓口 / 总线高亮：按角色分批用 {@link StepType#OUTLINE}（蓝色）勾勒，且总轮廓数收敛到
-     * {@link #HATCH_OUTLINE_LIMIT} 个代表位置（每角色取确定性前若干个），避免大量重叠轮廓。
+     * 仓口 / 总线教学：按功能分组（输入 → 输出 → 供能 → 辅助）分批 {@link StepType#OUTLINE} 高亮，
+     * 并在每组后给出一句自然语言的讲解。轮廓总数收敛到 {@link #HATCH_OUTLINE_LIMIT}。
      */
-    private static void appendHatchHighlight(StructureSource source, List<SceneElement> elements,
+    private static void appendHatchTeaching(StructureSource source, List<SceneElement> elements,
             List<SceneStep> steps) {
-        List<StructureRole> hatchRoles = hatchRolesPresent(source);
-        if (hatchRoles.isEmpty()) {
-            steps.add(text("text.hatches", NARRATION_HATCHES_NONE, TEXT_DURATION, List.of()));
-            return;
-        }
         int remaining = HATCH_OUTLINE_LIMIT;
-        for (StructureRole role : hatchRoles) {
-            if (remaining <= 0) {
+
+        List<StructureRole> inputs = presentRoles(source, INPUT_ROLES);
+        remaining = appendRolesOutline(source, elements, steps, inputs, remaining);
+        steps.add(inputsNarration(source, inputs));
+
+        List<StructureRole> outputs = presentRoles(source, OUTPUT_ROLES);
+        remaining = appendRolesOutline(source, elements, steps, outputs, remaining);
+        steps.add(outputsNarration(source, outputs));
+
+        List<StructureRole> energy = presentRoles(source, ENERGY_ROLES);
+        remaining = appendRolesOutline(source, elements, steps, energy, remaining);
+        steps.add(energyNarration(source, energy));
+
+        List<StructureRole> aux = presentRoles(source, AUX_ROLES);
+        appendRolesOutline(source, elements, steps, aux, remaining);
+        steps.add(pitfallsNarration(source, aux));
+    }
+
+    /**
+     * 为一组仓口角色发出 {@code outline} 步骤（每角色一个元素，区域位置在角色内均匀抽样），并从
+     * 剩余预算里扣减。返回剩余预算。
+     */
+    private static int appendRolesOutline(StructureSource source, List<SceneElement> elements,
+            List<SceneStep> steps, List<StructureRole> roles, int remaining) {
+        int left = remaining;
+        for (StructureRole role : roles) {
+            if (left <= 0) {
                 break;
             }
             int roleBlocks = countBlocksWithRole(source, role);
-            int limit = Math.min(roleBlocks, remaining);
+            int limit = Math.min(roleBlocks, left);
             if (limit <= 0) {
                 continue;
             }
@@ -309,10 +371,89 @@ public final class SceneGenerator {
                     .targets(List.of(id))
                     .param("visible", Boolean.TRUE)
                     .build());
-            remaining -= limit;
+            left -= limit;
         }
-        steps.add(text("text.hatches", NARRATION_HATCHES, TEXT_DURATION,
-                List.of(String.valueOf(source.hatches().size()), rolesText(hatchRoles))));
+        return left;
+    }
+
+    /** ① 用途：手写优先，否则「这是 <机器名>，一台 <尺寸> 的多方块机器」。 */
+    private static SceneStep purposeNarration(StructureSource source) {
+        if (MachineDescriptions.isCurated(source.id())) {
+            return text("text.purpose",
+                    MachineDescriptions.key(source.id(), MachineDescriptions.Field.PURPOSE),
+                    PURPOSE_TEXT_DURATION, List.of());
+        }
+        return text("text.purpose", NARRATION_PURPOSE, PURPOSE_TEXT_DURATION,
+                List.of(source.id(), sizeText(source)));
+    }
+
+    /** ② 怎么搭 / 成型要点：手写优先，否则讲控制器与通电成型。 */
+    private static SceneStep setupNarration(StructureSource source) {
+        if (MachineDescriptions.isCurated(source.id())) {
+            return text("text.setup",
+                    MachineDescriptions.key(source.id(), MachineDescriptions.Field.SETUP), TEXT_DURATION,
+                    List.of());
+        }
+        if (source.hasController()) {
+            return text("text.setup", NARRATION_SETUP, TEXT_DURATION, List.of());
+        }
+        return text("text.setup", NARRATION_SETUP_NONE, TEXT_DURATION, List.of());
+    }
+
+    /** ③ 输入什么：手写优先，否则用输入类仓口角色名自然叙述。 */
+    private static SceneStep inputsNarration(StructureSource source, List<StructureRole> roles) {
+        if (MachineDescriptions.isCurated(source.id())) {
+            return text("text.inputs",
+                    MachineDescriptions.key(source.id(), MachineDescriptions.Field.INPUTS), TEXT_DURATION,
+                    List.of());
+        }
+        if (roles.isEmpty()) {
+            return text("text.inputs", NARRATION_INPUTS_NONE, TEXT_DURATION, List.of());
+        }
+        return text("text.inputs", NARRATION_INPUTS, TEXT_DURATION, List.of(rolesText(roles)));
+    }
+
+    /** ④ 输出什么：手写优先，否则用输出类仓口角色名自然叙述。 */
+    private static SceneStep outputsNarration(StructureSource source, List<StructureRole> roles) {
+        if (MachineDescriptions.isCurated(source.id())) {
+            return text("text.outputs",
+                    MachineDescriptions.key(source.id(), MachineDescriptions.Field.OUTPUTS), TEXT_DURATION,
+                    List.of());
+        }
+        if (roles.isEmpty()) {
+            return text("text.outputs", NARRATION_OUTPUTS_NONE, TEXT_DURATION, List.of());
+        }
+        return text("text.outputs", NARRATION_OUTPUTS, TEXT_DURATION, List.of(rolesText(roles)));
+    }
+
+    /** ⑤ 供能与层级：手写优先；取电机器讲接线，发电机讲送电，不接电的机器明确说明。 */
+    private static SceneStep energyNarration(StructureSource source, List<StructureRole> roles) {
+        if (MachineDescriptions.isCurated(source.id())) {
+            return text("text.energy",
+                    MachineDescriptions.key(source.id(), MachineDescriptions.Field.ENERGY), TEXT_DURATION,
+                    List.of());
+        }
+        if (roles.contains(StructureRole.ENERGY_INPUT)) {
+            return text("text.energy", NARRATION_ENERGY, TEXT_DURATION, List.of(rolesText(roles)));
+        }
+        if (roles.contains(StructureRole.ENERGY_OUTPUT)) {
+            // 发电机只有能量输出仓：它向外送电，而不是取电。
+            return text("text.energy", NARRATION_ENERGY_OUTPUT, TEXT_DURATION, List.of());
+        }
+        return text("text.energy", NARRATION_ENERGY_NONE, TEXT_DURATION, List.of());
+    }
+
+    /** ⑥ 常见坑：手写优先，否则通用注意事项（有消声 / 维护 / 其它仓口时点出「保持就绪」）。 */
+    private static SceneStep pitfallsNarration(StructureSource source, List<StructureRole> aux) {
+        if (MachineDescriptions.isCurated(source.id())) {
+            return text("text.pitfalls",
+                    MachineDescriptions.key(source.id(), MachineDescriptions.Field.PITFALLS), TEXT_DURATION,
+                    List.of());
+        }
+        if (aux.isEmpty()) {
+            return text("text.pitfalls", NARRATION_PITFALLS_NONE, TEXT_DURATION, List.of());
+        }
+        return text("text.pitfalls", NARRATION_PITFALLS, TEXT_DURATION, List.of(rolesText(aux)));
     }
 
     /**
@@ -448,13 +589,9 @@ public final class SceneGenerator {
                 .duration(FORMED_PULSE_DURATION)
                 .targets(List.of(pulseTarget))
                 .build());
-        // 成型旁白机器特定：机器标识 / 结构尺寸 / 仓口·总线数量与角色 / 模块位数量。
-        steps.add(text("formed.text", NARRATION_FORMED, FORMED_TEXT_DURATION, List.of(
-                source.id(),
-                sizeText(source),
-                String.valueOf(source.hatches().size()),
-                rolesTextOrDash(hatchRolesPresent(source)),
-                String.valueOf(source.moduleSlotCount()))));
+        // 成型旁白：一句完整的「这就是它通电运转时的样子」，机器特定（标识 / 尺寸），不再是计数堆砌。
+        steps.add(text("formed.text", NARRATION_FORMED, FORMED_TEXT_DURATION,
+                List.of(source.id(), sizeText(source))));
     }
 
     private static SceneStep text(String id, String narrationKey, int duration, List<String> args) {
@@ -504,16 +641,15 @@ public final class SceneGenerator {
         return 1;
     }
 
-    private static List<StructureRole> hatchRolesPresent(StructureSource source) {
-        Set<StructureRole> roles = EnumSet.noneOf(StructureRole.class);
-        for (StructureBlock block : source.blocks()) {
-            if (block.role().isHatch()) {
-                roles.add(block.role());
+    /** 候选角色里在结构中实际出现的那些，按候选顺序（稳定的教学分组顺序）。 */
+    private static List<StructureRole> presentRoles(StructureSource source, List<StructureRole> candidates) {
+        List<StructureRole> present = new ArrayList<>();
+        for (StructureRole role : candidates) {
+            if (countBlocksWithRole(source, role) > 0) {
+                present.add(role);
             }
         }
-        List<StructureRole> sorted = new ArrayList<>(roles);
-        sorted.sort(Comparator.comparingInt(StructureRole::ordinal));
-        return sorted;
+        return List.copyOf(present);
     }
 
     private static int countBlocksWithRole(StructureSource source, StructureRole role) {
@@ -538,11 +674,7 @@ public final class SceneGenerator {
         return source.sizeX() + "x" + source.sizeY() + "x" + source.sizeZ();
     }
 
-    private static String positionText(StructureSource source) {
-        StructureSource.ControllerCell cell = source.controller();
-        return cell.x() + "," + cell.y() + "," + cell.z();
-    }
-
+    /** 角色列表文本，以 {@code ", "} 连接（渲染层替换为本地化分隔符）。 */
     private static String rolesText(List<StructureRole> roles) {
         StringBuilder builder = new StringBuilder();
         for (StructureRole role : roles) {
@@ -552,11 +684,6 @@ public final class SceneGenerator {
             builder.append(role.name());
         }
         return builder.toString();
-    }
-
-    /** 角色列表文本；空列表返回占位符 {@code —}，使成型旁白在无仓口时也可读。 */
-    private static String rolesTextOrDash(List<StructureRole> roles) {
-        return roles.isEmpty() ? "—" : rolesText(roles);
     }
 
 }

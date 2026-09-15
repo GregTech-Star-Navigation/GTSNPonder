@@ -67,9 +67,18 @@ class NarrationLocalizationTest {
 
         assertEquals(List.of(
                 NarrationLocalization.Part.key(GeneratedKeys.roleKey("ENERGY_INPUT")),
-                NarrationLocalization.Part.literal(", "),
+                NarrationLocalization.Part.key(GeneratedKeys.LIST_SEPARATOR),
                 NarrationLocalization.Part.key(GeneratedKeys.roleKey("MAINTENANCE"))),
-                parts, "hatch/bus role names must be localized, keeping the list separator");
+                parts, "hatch/bus role names must be localized, joined by the localized list separator");
+    }
+
+    @Test
+    void listSeparatorIsALocalizedKeyNotAHardCodedComma() {
+        // 中文顿号 / 英文逗号由语言表决定，故分隔符必须是可翻译键（工单 #18）。
+        List<NarrationLocalization.Part> parts = resolve("ITEM_INPUT, FLUID_INPUT", true);
+
+        assertEquals(NarrationLocalization.Part.key(GeneratedKeys.LIST_SEPARATOR), parts.get(1));
+        assertTrue(parts.get(1).translatable(), "the list separator must be localized");
     }
 
     @Test

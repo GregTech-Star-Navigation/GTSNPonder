@@ -8,6 +8,7 @@ import com.gtsn.ponder.catalog.SingleBlockScenes;
 import com.gtsn.ponder.content.SystemSceneKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.GtTierNames;
+import com.gtsn.ponder.generate.MachineDescriptions;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import org.junit.jupiter.api.Test;
@@ -37,11 +38,20 @@ class GeneratedLangKeysTest {
     private static final Path ZH = LANG_DIR.resolve("zh_cn.json");
 
     private static final List<String> NARRATION_KEYS = List.of(
-            SceneGenerator.NARRATION_INTRO,
-            SceneGenerator.NARRATION_CONTROLLER,
-            SceneGenerator.NARRATION_CONTROLLER_NONE,
-            SceneGenerator.NARRATION_HATCHES,
-            SceneGenerator.NARRATION_HATCHES_NONE,
+            GeneratedKeys.LIST_SEPARATOR,
+            // 多方块分步教学模式（工单 #18）
+            SceneGenerator.NARRATION_PURPOSE,
+            SceneGenerator.NARRATION_SETUP,
+            SceneGenerator.NARRATION_SETUP_NONE,
+            SceneGenerator.NARRATION_INPUTS,
+            SceneGenerator.NARRATION_INPUTS_NONE,
+            SceneGenerator.NARRATION_OUTPUTS,
+            SceneGenerator.NARRATION_OUTPUTS_NONE,
+            SceneGenerator.NARRATION_ENERGY,
+            SceneGenerator.NARRATION_ENERGY_NONE,
+            SceneGenerator.NARRATION_ENERGY_OUTPUT,
+            SceneGenerator.NARRATION_PITFALLS,
+            SceneGenerator.NARRATION_PITFALLS_NONE,
             SceneGenerator.NARRATION_MODULES,
             SceneGenerator.NARRATION_MODULES_NONE,
             SceneGenerator.NARRATION_MODULE_SLOT,
@@ -50,17 +60,18 @@ class GeneratedLangKeysTest {
             SceneGenerator.NARRATION_MODULE_INSTALLED,
             SceneGenerator.NARRATION_MODULE_INSTALLED_NO_EFFECT,
             SceneGenerator.NARRATION_FORMED,
-            // 单方块机器「使用场景」模板键（工单 #15）
-            SingleBlockUsageGenerator.NARRATION_INTRO,
-            SingleBlockUsageGenerator.NARRATION_MACHINE,
+            // 单方块机器「使用场景」分步教学模式（工单 #15 / #18）
+            SingleBlockUsageGenerator.NARRATION_PURPOSE,
+            SingleBlockUsageGenerator.NARRATION_SETUP,
             SingleBlockUsageGenerator.NARRATION_INPUTS,
             SingleBlockUsageGenerator.NARRATION_INPUTS_NONE,
             SingleBlockUsageGenerator.NARRATION_OUTPUTS,
             SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
             SingleBlockUsageGenerator.NARRATION_ENERGY,
-            SingleBlockUsageGenerator.NARRATION_PROGRESS,
-            SingleBlockUsageGenerator.NARRATION_COVERS,
+            SingleBlockUsageGenerator.NARRATION_ENERGY_NONE,
             SingleBlockUsageGenerator.NARRATION_PITFALLS,
+            SingleBlockUsageGenerator.NARRATION_PITFALLS_NONE,
+            SingleBlockUsageGenerator.NARRATION_COVERS,
             // 手作单方块场景（精选）的旁白键
             SingleBlockScenes.HAND_STEAM_FURNACE_INTRO,
             SingleBlockScenes.HAND_STEAM_FURNACE_USAGE,
@@ -164,6 +175,7 @@ class GeneratedLangKeysTest {
         JsonObject zh = read(ZH, "zh_cn");
         List<String> keys = new ArrayList<>(NARRATION_KEYS);
         keys.addAll(SystemSceneKeys.ALL);
+        keys.addAll(MachineDescriptions.allKeys());
         for (String key : keys) {
             String value = zh.get(key).getAsString();
             assertFalse(value.indexOf('\uFF08') >= 0,
@@ -176,10 +188,31 @@ class GeneratedLangKeysTest {
     @Test
     void countTemplatesCarryPlaceholders() throws IOException {
         JsonObject en = read(EN, "en_us");
-        assertTrue(en.get(SceneGenerator.NARRATION_HATCHES).getAsString().contains("%s"),
-                "hatch count template must carry a count placeholder");
+        assertTrue(en.get(SceneGenerator.NARRATION_PURPOSE).getAsString().contains("%s"),
+                "the purpose template must carry the machine-name / size placeholders");
         assertTrue(en.get(SceneGenerator.NARRATION_MODULES).getAsString().contains("%s"),
                 "module-slot count template must carry a count placeholder");
+        assertTrue(en.get(SingleBlockUsageGenerator.NARRATION_PURPOSE).getAsString().contains("%s"),
+                "the single-block purpose template must carry machine / tier / recipe placeholders");
+    }
+
+    /**
+     * 工单 #18：每台关键机器的手写教学说明键（用途 / 搭建 / 输入 / 输出 / 供能 / 常见坑）都必须经
+     * datagen 产出中英双语且非空白——防止「加了手写解说却忘了重跑 runData」。
+     */
+    @Test
+    void bothLocalesCoverEveryCuratedMachineDescription() throws IOException {
+        JsonObject en = read(EN, "en_us");
+        JsonObject zh = read(ZH, "zh_cn");
+        List<String> keys = MachineDescriptions.allKeys();
+        assertTrue(keys.size() >= 12 * MachineDescriptions.Field.values().length,
+                "at least 12 machines x 6 teaching fields expected, got " + keys.size());
+        for (String key : keys) {
+            assertTrue(en.has(key), "en_us is missing curated description key " + key);
+            assertTrue(zh.has(key), "zh_cn is missing curated description key " + key);
+            assertFalse(en.get(key).getAsString().isBlank(), key);
+            assertFalse(zh.get(key).getAsString().isBlank(), key);
+        }
     }
 
     /**

@@ -29,14 +29,15 @@ import java.util.function.Predicate;
  *   <li>其余（尺寸 {@code 3x3x3}、坐标、{@code —} 占位等）原样保留。</li>
  * </ol>
  *
- * <p>仓口 / 总线角色列表以 {@code ", "} 连接，故按该分隔符逐项解析后原样保留分隔符。是否为「已知键」
- * 由调用方注入（客户端为 {@code I18n}），使本逻辑可在 headless 单测中确定性覆盖。</p>
+ * <p>仓口 / 总线角色列表以 {@code ", "} 连接（生成器与语言无关），故按该分隔符逐项解析；分隔符本身解析为
+ * 本地化键 {@link GeneratedKeys#LIST_SEPARATOR}（中文顿号 / 英文逗号），使列表在中文旁白里读起来自然。
+ * 是否为「已知键」由调用方注入（客户端为 {@code I18n}），使本逻辑可在 headless 单测中确定性覆盖。</p>
  *
  * <p>纯 Java、零 MC 依赖。</p>
  */
 public final class NarrationLocalization {
 
-    /** 角色列表分隔符（与 {@code SceneGenerator.rolesText} 一致）。 */
+    /** 生成器写入的原始列表分隔符（{@code ", "}），渲染前替换为 {@link GeneratedKeys#LIST_SEPARATOR}。 */
     public static final String LIST_SEPARATOR = ", ";
 
     private NarrationLocalization() {
@@ -68,7 +69,8 @@ public final class NarrationLocalization {
         List<Part> parts = new ArrayList<>();
         for (int index = 0; index < tokens.length; index++) {
             if (index > 0) {
-                parts.add(Part.literal(LIST_SEPARATOR));
+                // 分隔符本身也是本地化键：中文渲染为顿号、英文为逗号（生成器只写与语言无关的 ", "）。
+                parts.add(Part.key(GeneratedKeys.LIST_SEPARATOR));
             }
             parts.add(resolveToken(tokens[index], keyExists));
         }

@@ -7,7 +7,9 @@ import com.gtsn.ponder.engine.model.SceneStep;
 import com.gtsn.ponder.engine.model.Source;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.gt.GtStructureAdapter;
+import com.gtsn.ponder.presenter.NarrationLocalization;
 import com.gtsn.ponder.structure.StructureBlock;
+import com.gtsn.ponder.structure.StructureRole;
 import com.gtsn.ponder.structure.StructureSource;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.logging.LogUtils;
@@ -15,6 +17,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.locale.Language;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameRules;
@@ -197,12 +200,76 @@ public final class AutogenAutotest {
             fail(minecraft, "generated scene has no steps for " + scene.target());
             return;
         }
+        if (!assertTeachingNarration(minecraft, scene)) {
+            return;
+        }
         LOGGER.info("[GTSNPonder] autogen autotest: playing generated '{}' ({} blocks, mode={}, steps={})",
                 scene.target(), targets.get(index).source().blockCount(),
                 targets.get(index).roleGrouped() ? "role-grouped/LOD" : "layer-by-layer",
                 scene.steps().size());
         stage = Stage.REVEAL;
         ticks = 0;
+    }
+
+    /**
+     * 工单 #18 的 FAIL-ABLE 断言：生成的多方块旁白必须是「分步教学」结构——固定顺序
+     * 用途 → 搭建/成型 → 输入 → 输出 → 供能 → 常见坑；每个旁白键都在当前语言表里；渲染后不露出原始
+     * {@code gtceu:} 注册名或 {@link StructureRole} 枚举名。失败即记录 FAIL 并截图退出。
+     */
+    private static boolean assertTeachingNarration(Minecraft minecraft, SceneData scene) {
+        List<String> ids = scene.steps().stream().map(SceneStep::id).toList();
+        int purpose = ids.indexOf("text.purpose");
+        int setup = ids.indexOf("text.setup");
+        int inputs = ids.indexOf("text.inputs");
+        int outputs = ids.indexOf("text.outputs");
+        int energy = ids.indexOf("text.energy");
+        int pitfalls = ids.indexOf("text.pitfalls");
+        if (purpose < 0 || setup < 0 || inputs < 0 || outputs < 0 || energy < 0 || pitfalls < 0) {
+            fail(minecraft, scene.target() + " is missing teaching narration steps: " + ids);
+            return false;
+        }
+        int firstBuild = firstIndexStartingWith(ids, "build.");
+        if (firstBuild < 0 || !(purpose < firstBuild && firstBuild < setup && setup < inputs
+                && inputs < outputs && outputs < energy && energy < pitfalls)) {
+            fail(minecraft, scene.target() + " teaching steps are out of order: " + ids);
+            return false;
+        }
+        for (SceneStep step : scene.steps()) {
+            if (step.narration() != null && !Language.getInstance().has(step.narration())) {
+                fail(minecraft, scene.target() + " narration key is not localized: " + step.narration());
+                return false;
+            }
+        }
+        for (SceneStep step : scene.steps()) {
+            if (step.narration() == null) {
+                continue;
+            }
+            for (List<NarrationLocalization.Part> arg : NarrationLocalization.resolveArgs(
+                    step.narrationArgs(), Language.getInstance()::has)) {
+                for (NarrationLocalization.Part part : arg) {
+                    if (part.translatable()) {
+                        continue;
+                    }
+                    if (part.value().contains(":") || StructureRole.fromName(part.value()).isPresent()) {
+                        fail(minecraft, scene.target() + " narration leaks a raw token '" + part.value()
+                                + "' at step " + step.id());
+                        return false;
+                    }
+                }
+            }
+        }
+        LOGGER.info("[GTSNPonder] autogen autotest: teaching narration verified for {} ({} steps, "
+                + "purpose/setup/inputs/outputs/energy/pitfalls in order)", scene.target(), ids.size());
+        return true;
+    }
+
+    private static int firstIndexStartingWith(List<String> ids, String prefix) {
+        for (int i = 0; i < ids.size(); i++) {
+            if (ids.get(i).startsWith(prefix)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /** 结构完全揭示（所有 build 分段可见）后抓一张（展示搭建完成的未成型形态）。 */

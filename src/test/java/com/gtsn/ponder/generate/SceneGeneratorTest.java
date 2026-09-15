@@ -311,20 +311,16 @@ class SceneGeneratorTest {
     }
 
     @Test
-    void formedNarrationIsMachineSpecific() {
+    void formedNarrationIsMachineSpecificAndTeaching() {
         SceneStep mediumFormed = step(SceneGenerator.generate(medium()), "formed.text").orElseThrow();
         assertEquals(SceneGenerator.NARRATION_FORMED, mediumFormed.narration());
-        assertEquals(List.of("gtceu:medium_machine", "5x5x5", "2", "ITEM_INPUT, FLUID_OUTPUT", "0"),
-                mediumFormed.narrationArgs(),
-                "formed narration must carry machine id / size / hatch count+roles / module count");
+        assertEquals(List.of("gtceu:medium_machine", "5x5x5"), mediumFormed.narrationArgs(),
+                "formed narration must be a teaching sentence carrying machine name / size, not a count dump");
 
         SceneStep largeFormed = step(SceneGenerator.generate(large()), "formed.text").orElseThrow();
         assertNotEquals(mediumFormed.narrationArgs(), largeFormed.narrationArgs(),
                 "different machines must produce different formed narration");
-
-        SceneStep moduledFormed = step(SceneGenerator.generate(withModuleSlot()), "formed.text").orElseThrow();
-        assertEquals("1", moduledFormed.narrationArgs().get(4),
-                "module slot count must be part of the formed narration");
+        assertEquals(List.of("gtceu:large_machine", "7x7x7"), largeFormed.narrationArgs());
     }
 
     @Test
@@ -346,25 +342,99 @@ class SceneGeneratorTest {
         assertTrue(source.hatches().size() > total,
                 "outlines must be fewer than all hatch blocks (" + source.hatches().size() + ")");
 
-        // 旁白仍如实报告完整的仓口块数。
-        assertEquals("6", step(scene, "text.hatches").orElseThrow().narrationArgs().get(0));
+        // 输入讲解自然表述：用本地化角色名（而非「数量 + 括号枚举」）指出原料从哪进。
+        SceneStep inputs = step(scene, "text.inputs").orElseThrow();
+        assertEquals(SceneGenerator.NARRATION_INPUTS, inputs.narration());
+        assertEquals(List.of("ITEM_INPUT"), inputs.narrationArgs());
     }
 
     @Test
-    void narrationIsMachineSpecificAndCarriesTemplateArgs() {
+    void purposeNarrationIsMachineSpecificAndCarriesTemplateArgs() {
         SceneData smallScene = SceneGenerator.generate(small());
-        SceneStep intro = step(smallScene, "intro").orElseThrow();
-        assertEquals(SceneGenerator.NARRATION_INTRO, intro.narration());
-        assertTrue(intro.narrationArgs().contains("gtceu:small_machine"), intro.narrationArgs().toString());
-        assertTrue(intro.narrationArgs().contains("3x3x3"), intro.narrationArgs().toString());
+        SceneStep purpose = step(smallScene, "text.purpose").orElseThrow();
+        assertEquals(SceneGenerator.NARRATION_PURPOSE, purpose.narration());
+        assertTrue(purpose.narrationArgs().contains("gtceu:small_machine"), purpose.narrationArgs().toString());
+        assertTrue(purpose.narrationArgs().contains("3x3x3"), purpose.narrationArgs().toString());
 
-        SceneStep largeIntro = step(SceneGenerator.generate(large()), "intro").orElseThrow();
-        assertNotEquals(intro.narrationArgs(), largeIntro.narrationArgs(),
+        SceneStep largePurpose = step(SceneGenerator.generate(large()), "text.purpose").orElseThrow();
+        assertNotEquals(purpose.narrationArgs(), largePurpose.narrationArgs(),
                 "different machines must produce different narration args");
+    }
 
-        SceneStep hatchText = step(SceneGenerator.generate(medium()), "text.hatches").orElseThrow();
-        assertEquals(SceneGenerator.NARRATION_HATCHES, hatchText.narration());
-        assertEquals(List.of("2", "ITEM_INPUT, FLUID_OUTPUT"), hatchText.narrationArgs());
+    @Test
+    void inputsAndOutputsNarrationUseNaturalRoleSentences() {
+        SceneData scene = SceneGenerator.generate(medium());
+
+        SceneStep inputs = step(scene, "text.inputs").orElseThrow();
+        assertEquals(SceneGenerator.NARRATION_INPUTS, inputs.narration());
+        assertEquals(List.of("ITEM_INPUT"), inputs.narrationArgs());
+
+        SceneStep outputs = step(scene, "text.outputs").orElseThrow();
+        assertEquals(SceneGenerator.NARRATION_OUTPUTS, outputs.narration());
+        assertEquals(List.of("FLUID_OUTPUT"), outputs.narrationArgs());
+    }
+
+    @Test
+    void narrationFollowsTheFixedTeachingOrder() {
+        SceneData scene = SceneGenerator.generate(medium()); // 含 ITEM_INPUT + FLUID_OUTPUT
+        List<String> ids = scene.steps().stream().map(SceneStep::id).toList();
+
+        int purpose = ids.indexOf("text.purpose");
+        int build = indexOfFirstBuild(ids);
+        int setup = ids.indexOf("text.setup");
+        int inputs = ids.indexOf("text.inputs");
+        int outputs = ids.indexOf("text.outputs");
+        int energy = ids.indexOf("text.energy");
+        int pitfalls = ids.indexOf("text.pitfalls");
+
+        assertTrue(purpose >= 0 && setup >= 0 && inputs >= 0 && outputs >= 0 && energy >= 0 && pitfalls >= 0,
+                () -> "missing a teaching step: " + ids);
+        assertTrue(purpose < build, () -> "用途 must come before the build reveal: " + ids);
+        assertTrue(build < setup, () -> "搭建/成型要点 must come after the build reveal: " + ids);
+        assertTrue(setup < inputs, () -> "输入 must follow the setup: " + ids);
+        assertTrue(inputs < outputs, () -> "输出 must follow the inputs: " + ids);
+        assertTrue(outputs < energy, () -> "供能 must follow the outputs: " + ids);
+        assertTrue(energy < pitfalls, () -> "常见坑 must follow the energy step: " + ids);
+    }
+
+    @Test
+    void powerConsumersNarrateTheirEnergyInputHatch() {
+        StructureSource consumer = solidGrid("gtceu:test_consumer", 3, new int[] { 1, 1, 1 },
+                Map.of("0,1,1", StructureRole.ENERGY_INPUT));
+
+        SceneStep energy = step(SceneGenerator.generate(consumer), "text.energy").orElseThrow();
+
+        assertEquals(SceneGenerator.NARRATION_ENERGY, energy.narration());
+        assertEquals(List.of("ENERGY_INPUT"), energy.narrationArgs());
+    }
+
+    @Test
+    void generatorsNarrateProducingPowerInsteadOfConsumingIt() {
+        StructureSource generator = solidGrid("gtceu:test_generator", 3, new int[] { 1, 1, 1 },
+                Map.of("0,1,1", StructureRole.ENERGY_OUTPUT));
+
+        SceneStep energy = step(SceneGenerator.generate(generator), "text.energy").orElseThrow();
+
+        assertEquals(SceneGenerator.NARRATION_ENERGY_OUTPUT, energy.narration(),
+                "a machine with an energy OUTPUT is a generator and must not be told to draw power");
+        assertTrue(energy.narrationArgs().isEmpty());
+    }
+
+    @Test
+    void curatedMachineNarrationUsesTheHandWrittenKeys() {
+        StructureSource curated = solidGrid("gtceu:electric_blast_furnace", 3, new int[] { 1, 1, 1 },
+                Map.of("0,1,1", StructureRole.ENERGY_INPUT));
+
+        SceneData scene = SceneGenerator.generate(curated);
+
+        assertEquals(MachineDescriptions.key("gtceu:electric_blast_furnace", MachineDescriptions.Field.PURPOSE),
+                step(scene, "text.purpose").orElseThrow().narration());
+        assertTrue(step(scene, "text.purpose").orElseThrow().narrationArgs().isEmpty(),
+                "hand-written purpose is a complete sentence (no template args)");
+        assertEquals(MachineDescriptions.key("gtceu:electric_blast_furnace", MachineDescriptions.Field.INPUTS),
+                step(scene, "text.inputs").orElseThrow().narration());
+        assertEquals(MachineDescriptions.key("gtceu:electric_blast_furnace", MachineDescriptions.Field.PITFALLS),
+                step(scene, "text.pitfalls").orElseThrow().narration());
     }
 
     @Test
@@ -380,8 +450,14 @@ class SceneGeneratorTest {
     void narrationStatesMissingCapabilitiesExplicitly() {
         SceneData scene = SceneGenerator.generate(exactlyBudget());
 
-        assertEquals(SceneGenerator.NARRATION_HATCHES_NONE,
-                step(scene, "text.hatches").orElseThrow().narration());
+        assertEquals(SceneGenerator.NARRATION_INPUTS_NONE,
+                step(scene, "text.inputs").orElseThrow().narration());
+        assertEquals(SceneGenerator.NARRATION_OUTPUTS_NONE,
+                step(scene, "text.outputs").orElseThrow().narration());
+        assertEquals(SceneGenerator.NARRATION_ENERGY_NONE,
+                step(scene, "text.energy").orElseThrow().narration());
+        assertEquals(SceneGenerator.NARRATION_PITFALLS_NONE,
+                step(scene, "text.pitfalls").orElseThrow().narration());
         assertEquals(SceneGenerator.NARRATION_MODULES_NONE,
                 step(scene, "text.modules").orElseThrow().narration());
     }

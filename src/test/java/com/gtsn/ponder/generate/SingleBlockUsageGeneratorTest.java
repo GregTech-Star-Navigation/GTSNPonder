@@ -41,18 +41,18 @@ class SingleBlockUsageGeneratorTest {
                 .build();
     }
 
-    /** 电解机：物品 + 流体进出，接电。 */
+    /** 洗矿机（未登记手写解说）：物品 + 流体进出，接电，用于结构化模板路径。 */
     private static SingleBlockMachineSource electrolyzer() {
-        return SingleBlockMachineSource.builder("gtceu:lv_electrolyzer")
-                .displayName("block.gtceu.lv_electrolyzer")
-                .blockId("gtceu:lv_electrolyzer")
+        return SingleBlockMachineSource.builder("gtceu:lv_ore_washer")
+                .displayName("block.gtceu.lv_ore_washer")
+                .blockId("gtceu:lv_ore_washer")
                 .tier(1, "LV")
                 .itemInputs(1)
                 .itemOutputs(2)
                 .fluidInputs(1)
                 .fluidOutputs(1)
                 .energy(true)
-                .addRecipeType("gtceu:electrolyzer")
+                .addRecipeType("gtceu:ore_washer")
                 .build();
     }
 
@@ -62,6 +62,19 @@ class SingleBlockUsageGeneratorTest {
                 .blockId("gtceu:lv_transformer_1a")
                 .tier(1, "LV")
                 .energy(true)
+                .build();
+    }
+
+    /** 未被手写解说登记的单方块机器（验证结构化模板回退）。 */
+    private static SingleBlockMachineSource machineWithoutCuration() {
+        return SingleBlockMachineSource.builder("gtceu:lv_electric_furnace")
+                .displayName("block.gtceu.lv_electric_furnace")
+                .blockId("gtceu:lv_electric_furnace")
+                .tier(1, "LV")
+                .itemInputs(1)
+                .itemOutputs(1)
+                .energy(true)
+                .addRecipeType("gtceu:electric_furnace")
                 .build();
     }
 
@@ -122,9 +135,8 @@ class SingleBlockUsageGeneratorTest {
     void usageSceneShapeIsUsageStepsNotBuildOrFormedDemo() {
         SceneData scene = SingleBlockUsageGenerator.generate(electrolyzer());
 
-        assertEquals(List.of("focus.camera", "build.machine", "intro", "highlight.machine",
-                "text.machine", "text.inputs", "text.outputs", "text.energy", "text.progress",
-                "text.covers", "text.pitfalls"),
+        assertEquals(List.of("focus.camera", "build.machine", "text.purpose", "highlight.machine",
+                "text.setup", "text.inputs", "text.outputs", "text.energy", "text.pitfalls", "text.covers"),
                 scene.steps().stream().map(SceneStep::id).toList());
 
         assertTrue(scene.steps().stream().noneMatch(s -> s.id().startsWith("formed.")),
@@ -148,31 +160,73 @@ class SingleBlockUsageGeneratorTest {
     }
 
     @Test
-    void narrationCoversMachineInputsOutputsEnergyProgressCoversAndPitfalls() {
+    void narrationCoversPurposeSetupInputsOutputsEnergyAndPitfalls() {
         SceneData scene = SingleBlockUsageGenerator.generate(electrolyzer());
 
-        assertEquals(SingleBlockUsageGenerator.NARRATION_INTRO,
-                step(scene, "intro").orElseThrow().narration());
-        assertEquals(SingleBlockUsageGenerator.NARRATION_MACHINE,
-                step(scene, "text.machine").orElseThrow().narration());
+        assertEquals(SingleBlockUsageGenerator.NARRATION_PURPOSE,
+                step(scene, "text.purpose").orElseThrow().narration());
+        assertEquals(SingleBlockUsageGenerator.NARRATION_SETUP,
+                step(scene, "text.setup").orElseThrow().narration());
         assertEquals(SingleBlockUsageGenerator.NARRATION_INPUTS,
                 step(scene, "text.inputs").orElseThrow().narration());
         assertEquals(SingleBlockUsageGenerator.NARRATION_OUTPUTS,
                 step(scene, "text.outputs").orElseThrow().narration());
         assertEquals(SingleBlockUsageGenerator.NARRATION_ENERGY,
                 step(scene, "text.energy").orElseThrow().narration());
-        assertEquals(SingleBlockUsageGenerator.NARRATION_PROGRESS,
-                step(scene, "text.progress").orElseThrow().narration());
-        assertEquals(SingleBlockUsageGenerator.NARRATION_COVERS,
-                step(scene, "text.covers").orElseThrow().narration());
         assertEquals(SingleBlockUsageGenerator.NARRATION_PITFALLS,
                 step(scene, "text.pitfalls").orElseThrow().narration());
+        assertEquals(SingleBlockUsageGenerator.NARRATION_COVERS,
+                step(scene, "text.covers").orElseThrow().narration());
 
         // 机器特定：模板参数携带 id / 等级 / 配方类型与槽位·罐数。
-        assertEquals(List.of("gtceu:lv_electrolyzer", "LV", "gtceu:electrolyzer"),
-                step(scene, "intro").orElseThrow().narrationArgs());
+        assertEquals(List.of("gtceu:lv_ore_washer", "LV", "gtceu:ore_washer"),
+                step(scene, "text.purpose").orElseThrow().narrationArgs());
         assertEquals(List.of("1", "1"), step(scene, "text.inputs").orElseThrow().narrationArgs());
         assertEquals(List.of("2", "1"), step(scene, "text.outputs").orElseThrow().narrationArgs());
+    }
+
+    @Test
+    void narrationFollowsTheFixedTeachingOrder() {
+        SceneData scene = SingleBlockUsageGenerator.generate(electrolyzer());
+        List<String> ids = scene.steps().stream().map(SceneStep::id).toList();
+
+        int purpose = ids.indexOf("text.purpose");
+        int setup = ids.indexOf("text.setup");
+        int inputs = ids.indexOf("text.inputs");
+        int outputs = ids.indexOf("text.outputs");
+        int energy = ids.indexOf("text.energy");
+        int pitfalls = ids.indexOf("text.pitfalls");
+        assertTrue(purpose >= 0 && setup >= 0 && inputs >= 0 && outputs >= 0 && energy >= 0 && pitfalls >= 0,
+                () -> "missing a teaching step: " + ids);
+        assertTrue(purpose < setup && setup < inputs && inputs < outputs && outputs < energy
+                        && energy < pitfalls,
+                () -> "teaching steps must follow 用途→搭建→输入→输出→供能→坑: " + ids);
+        assertTrue(ids.indexOf("highlight.machine") < setup,
+                () -> "the machine highlight must precede the setup explanation: " + ids);
+    }
+
+    @Test
+    void curatedSingleBlockMachineUsesTheHandWrittenKeys() {
+        SceneData scene = SingleBlockUsageGenerator.generate(macerator());
+
+        assertTrue(MachineDescriptions.isCurated("gtceu:lv_macerator"));
+        assertEquals(MachineDescriptions.key("gtceu:lv_macerator", MachineDescriptions.Field.PURPOSE),
+                step(scene, "text.purpose").orElseThrow().narration());
+        assertTrue(step(scene, "text.purpose").orElseThrow().narrationArgs().isEmpty(),
+                "hand-written purpose is a complete sentence (no template args)");
+        assertEquals(MachineDescriptions.key("gtceu:lv_macerator", MachineDescriptions.Field.PITFALLS),
+                step(scene, "text.pitfalls").orElseThrow().narration());
+    }
+
+    @Test
+    void uncuratedSingleBlockMachineFallsBackToTheStructuredTemplate() {
+        SceneData scene = SingleBlockUsageGenerator.generate(machineWithoutCuration());
+
+        assertFalse(MachineDescriptions.isCurated("gtceu:lv_electric_furnace"));
+        assertEquals(SingleBlockUsageGenerator.NARRATION_PURPOSE,
+                step(scene, "text.purpose").orElseThrow().narration());
+        assertEquals(List.of("gtceu:lv_electric_furnace", "LV", "gtceu:electric_furnace"),
+                step(scene, "text.purpose").orElseThrow().narrationArgs());
     }
 
     @Test

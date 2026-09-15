@@ -7,6 +7,7 @@ import com.gtsn.ponder.content.SystemSceneKeys;
 import com.gtsn.ponder.editor.EditorKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.GtTierNames;
+import com.gtsn.ponder.generate.MachineDescriptions;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import com.gtsn.ponder.gt.GtMultiblockCatalog;
@@ -53,6 +54,8 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("key.categories.gtsnponder", "GTSN Ponder");
         keys.put("key.gtsnponder.ponder", "Open Ponder");
         keys.put("key.gtsnponder.catalog", "Open Ponder Catalog");
+        // 旁白列表分隔符（工单 #18）：生成器写 ", "，渲染时替换为本键。
+        keys.put(GeneratedKeys.LIST_SEPARATOR, ", ");
 
         keys.put("ponder.gtsnponder.coke_oven.title", "Coke Oven");
         keys.put("ponder.gtsnponder.coke_oven.narration.intro",
@@ -70,18 +73,30 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.control.replay", "Replay");
         keys.put("ponder.gtsnponder.player.seekhint", "Click the bar to seek");
 
-        keys.put(SceneGenerator.NARRATION_INTRO,
-                "This is %s, a %s multiblock. Watch how the blocks come together.");
-        keys.put(SceneGenerator.NARRATION_CONTROLLER,
-                "The controller is at %s - power it to form the structure.");
-        keys.put(SceneGenerator.NARRATION_CONTROLLER_NONE,
-                "This structure page declares no controller block.");
-        keys.put(SceneGenerator.NARRATION_HATCHES, "%s hatch / bus block(s), across %s.");
-        keys.put(SceneGenerator.NARRATION_HATCHES_NONE,
-                "This structure declares no hatches or buses.");
+        keys.put(SceneGenerator.NARRATION_PURPOSE, "This is %s, a %s multiblock machine.");
+        keys.put(SceneGenerator.NARRATION_SETUP,
+                "The gold-outlined block is the controller - once its forming conditions are met "
+                        + "(power, steam or fuel), the whole machine forms.");
+        keys.put(SceneGenerator.NARRATION_SETUP_NONE,
+                "This structure has no controller; just place every block as shown.");
+        keys.put(SceneGenerator.NARRATION_INPUTS, "Feed the ingredients in through the %s.");
+        keys.put(SceneGenerator.NARRATION_INPUTS_NONE, "This machine takes no external inputs.");
+        keys.put(SceneGenerator.NARRATION_OUTPUTS, "The products come out of the %s.");
+        keys.put(SceneGenerator.NARRATION_OUTPUTS_NONE, "This machine has no outputs of its own.");
+        keys.put(SceneGenerator.NARRATION_ENERGY,
+                "For power, connect a cable of the matching tier to the %s and it will run.");
+        keys.put(SceneGenerator.NARRATION_ENERGY_NONE,
+                "It does not hook up to power - steam or fuel-driven machines work through their own inputs.");
+        keys.put(SceneGenerator.NARRATION_ENERGY_OUTPUT,
+                "It is a generator: connect the output energy hatch to your grid to send the power out.");
+        keys.put(SceneGenerator.NARRATION_PITFALLS,
+                "Common pitfalls: a clogged output stops processing, keep the %s ready, and the voltage "
+                        + "tier must match the machine.");
+        keys.put(SceneGenerator.NARRATION_PITFALLS_NONE,
+                "Common pitfalls: a clogged output stops processing, and the voltage tier must match the machine.");
         keys.put(SceneGenerator.NARRATION_MODULES,
-                "%s module slot(s) - install matching modules here.");
-        keys.put(SceneGenerator.NARRATION_MODULES_NONE, "This structure declares no module slots.");
+                "This machine has %s module slot(s); fitting the right modules upgrades it.");
+        keys.put(SceneGenerator.NARRATION_MODULES_NONE, "This machine has no module slots.");
         keys.put(SceneGenerator.NARRATION_MODULE_SLOT, "Slot %s: accepts %s.");
         keys.put(SceneGenerator.NARRATION_MODULE_SLOT_ANY, "Slot %s: accepts any module.");
         keys.put(SceneGenerator.NARRATION_MODULE_SLOT_NONE, "Slot %s: accepts no module.");
@@ -91,8 +106,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(SceneGenerator.NARRATION_MODULE_INSTALLED_NO_EFFECT,
                 "Installed %s into slot %s - no recipe effects.");
         keys.put(SceneGenerator.NARRATION_FORMED,
-                "%s (%s) formed demo: %s hatch/bus block(s) (%s), %s module slot(s). "
-                        + "Hidden then shown again: unformed -> formed.");
+                "%s (%s) is now formed - this is how it looks when running.");
 
         keys.put(GeneratedKeys.LEGEND_TITLE, "Legend");
         keys.put(GeneratedKeys.LEGEND_CONTROLLER, "Controller (gold)");
@@ -111,6 +125,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         catalogKeys(keys, false);
         systemSceneKeys(keys, false);
         usageSceneKeys(keys, false);
+        curatedDescriptions(keys, false);
         roleKeys(keys, false);
         tierKeys(keys, false);
         return keys;
@@ -121,6 +136,8 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("key.categories.gtsnponder", "格雷科技·思索");
         keys.put("key.gtsnponder.ponder", "打开思索");
         keys.put("key.gtsnponder.catalog", "打开思索图鉴");
+        // 旁白列表分隔符（工单 #18）：中文用顿号，避免半角逗号堆砌。
+        keys.put(GeneratedKeys.LIST_SEPARATOR, "、");
 
         keys.put("ponder.gtsnponder.coke_oven.title", "焦炉");
         keys.put("ponder.gtsnponder.coke_oven.narration.intro", "这是焦炉：一台 3×3×3 的多方块，把煤炭炼成焦炭。");
@@ -135,21 +152,30 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.control.replay", "重播");
         keys.put("ponder.gtsnponder.player.seekhint", "点击进度条跳转");
 
-        keys.put(SceneGenerator.NARRATION_INTRO, "这是 %s，一台 %s 的多方块。看看方块如何拼合。");
-        keys.put(SceneGenerator.NARRATION_CONTROLLER, "控制器位于 %s，通电后多方块即成型。");
-        keys.put(SceneGenerator.NARRATION_CONTROLLER_NONE, "该结构页未声明控制器方块。");
-        keys.put(SceneGenerator.NARRATION_HATCHES, "%s 个仓口 / 总线 (%s)。");
-        keys.put(SceneGenerator.NARRATION_HATCHES_NONE, "该结构未声明仓口或总线。");
-        keys.put(SceneGenerator.NARRATION_MODULES, "%s 个模块位——在此安装匹配的模块。");
-        keys.put(SceneGenerator.NARRATION_MODULES_NONE, "该结构未声明模块位。");
+        keys.put(SceneGenerator.NARRATION_PURPOSE, "这是 %s——一台 %s 的多方块机器。");
+        keys.put(SceneGenerator.NARRATION_SETUP,
+                "金色高亮的是控制器——满足它的成型条件 (供电、蒸汽或燃料等) 后，整台机器就会成型。");
+        keys.put(SceneGenerator.NARRATION_SETUP_NONE, "该结构没有控制器，按结构页把方块摆齐即可。");
+        keys.put(SceneGenerator.NARRATION_INPUTS, "把原料送入%s。");
+        keys.put(SceneGenerator.NARRATION_INPUTS_NONE, "这台机器不需要外部原料输入。");
+        keys.put(SceneGenerator.NARRATION_OUTPUTS, "产物会从%s输出。");
+        keys.put(SceneGenerator.NARRATION_OUTPUTS_NONE, "这台机器没有对外的产物输出。");
+        keys.put(SceneGenerator.NARRATION_ENERGY, "供能：把对应等级的线缆接到%s上，它就能运转。");
+        keys.put(SceneGenerator.NARRATION_ENERGY_NONE, "它不接电力——蒸汽或燃料驱动的机器靠各自的接口工作。");
+        keys.put(SceneGenerator.NARRATION_ENERGY_OUTPUT, "它是一台发电机——把能量输出仓接到电网，就能把电力送出去。");
+        keys.put(SceneGenerator.NARRATION_PITFALLS,
+                "常见坑：输出口堵塞时加工会停止；%s要记得保持就绪；接入的电压等级要和机器匹配。");
+        keys.put(SceneGenerator.NARRATION_PITFALLS_NONE,
+                "常见坑：输出口堵塞时加工会停止；接入的电压等级要和机器匹配。");
+        keys.put(SceneGenerator.NARRATION_MODULES, "这台机器有 %s 个模块位，装上匹配的模块可以强化它。");
+        keys.put(SceneGenerator.NARRATION_MODULES_NONE, "这台机器没有模块位。");
         keys.put(SceneGenerator.NARRATION_MODULE_SLOT, "槽 %s：接受 %s。");
         keys.put(SceneGenerator.NARRATION_MODULE_SLOT_ANY, "槽 %s：接受任意模块。");
         keys.put(SceneGenerator.NARRATION_MODULE_SLOT_NONE, "槽 %s：不接受任何模块。");
         keys.put(SceneGenerator.NARRATION_MODULE_INSTALLED,
                 "安装 %s 到槽 %s——并行 %s、速度 ×%s、能耗 ×%s、输入 ×%s、输出 ×%s、等级 +%s。");
         keys.put(SceneGenerator.NARRATION_MODULE_INSTALLED_NO_EFFECT, "安装 %s 到槽 %s——无配方效果。");
-        keys.put(SceneGenerator.NARRATION_FORMED,
-                "%s(%s)成型演示：本机 %s 个仓口 / 总线 (%s)、%s 个模块位。先隐藏再重现，即未成型 → 成型。");
+        keys.put(SceneGenerator.NARRATION_FORMED, "%s (%s) 已经成型——这就是它工作时的样子。");
 
         keys.put(GeneratedKeys.LEGEND_TITLE, "图例");
         keys.put(GeneratedKeys.LEGEND_CONTROLLER, "控制器（金色）");
@@ -167,6 +193,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         catalogKeys(keys, true);
         systemSceneKeys(keys, true);
         usageSceneKeys(keys, true);
+        curatedDescriptions(keys, true);
         roleKeys(keys, true);
         tierKeys(keys, true);
         return keys;
@@ -310,26 +337,28 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
      */
     private static void usageSceneKeys(Map<String, String> keys, boolean chinese) {
         if (chinese) {
-            keys.put(SingleBlockUsageGenerator.NARRATION_INTRO,
-                    "这是 %s(%s)，配方类型：%s。下面讲解如何使用它。");
-            keys.put(SingleBlockUsageGenerator.NARRATION_MACHINE,
-                    "%s 本身就是整台机器——所有部件都在这一个方块里。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_PURPOSE,
+                    "这是%s，一台%s的机器；它能处理%s配方。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_SETUP,
+                    "%s 整台机器就是这一个方块——所有部件都在里面。");
             keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS,
-                    "输入：%s 个物品槽、%s 个流体罐。把配方原料放进来。");
+                    "使用时把原料放进输入槽 (%s 个物品槽、%s 个流体罐)。");
             keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS_NONE,
-                    "这台机器没有物品 / 流体输入(%s 个物品槽、%s 个流体罐)，它只对自身工作。");
+                    "它没有物品 / 流体输入 (%s 个物品槽、%s 个流体罐)，只对自身工作。");
             keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS,
-                    "输出：%s 个物品槽、%s 个流体罐。从这里取出产物。");
+                    "产物会出现在输出槽 (%s 个物品槽、%s 个流体罐)，记得及时取走。");
             keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
-                    "这台机器没有物品 / 流体输出(%s 个物品槽、%s 个流体罐)。");
+                    "它没有物品 / 流体产物输出 (%s 个物品槽、%s 个流体罐)。");
             keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY,
-                    "能量：它的电压等级是 %s。接上匹配的线缆或发电机即可供电。");
-            keys.put(SingleBlockUsageGenerator.NARRATION_PROGRESS,
-                    "配方运行时进度条会填充；若停滞，说明在等待原料或电力。");
-            keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
-                    "覆盖板可装在机器侧面：传送带(物品)、泵(流体)、机器控制器(自动进出)等。");
+                    "它用%s电力运行——接上对应等级的线缆或发电机即可。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY_NONE,
+                    "它不接电力——蒸汽机器靠蒸汽驱动。");
             keys.put(SingleBlockUsageGenerator.NARRATION_PITFALLS,
-                    "常见坑：通入 %s 或更高电压会损坏机器；产物槽满则处理停止。");
+                    "常见坑：输出槽满或原料不足时加工会停住；接入的电压等级要和机器匹配。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_PITFALLS_NONE,
+                    "常见坑：输出槽满或原料不足时加工会停住，进度条会卡住不动。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
+                    "进阶：给机器侧面装上覆盖板就能自动化——传送带搬物品、泵抽流体、机器控制器自动进出。");
             keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_INTRO,
                     "这是低压蒸汽熔炉——一台靠蒸汽驱动的青铜时代熔炉。");
             keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_USAGE,
@@ -340,29 +369,29 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
                     "把矿石放进输入槽，通入 LV 电力，再从输出槽取出粉末。");
             return;
         }
-        keys.put(SingleBlockUsageGenerator.NARRATION_INTRO,
-                "This is %s (%s). Recipe types: %s. Here is how to use it.");
-        keys.put(SingleBlockUsageGenerator.NARRATION_MACHINE,
-                "%s is the machine itself - the whole machine fits in this one block.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_PURPOSE,
+                "This is %s, a %s machine; it handles %s recipes.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_SETUP,
+                "%s is the whole machine - everything sits inside this single block.");
         keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS,
-                "Inputs: %s item slot(s) and %s fluid tank(s). Insert the recipe ingredients here.");
+                "Put the ingredients into the input slots (%s item slot(s), %s fluid tank(s)).");
         keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS_NONE,
-                "This machine takes no item or fluid inputs (%s item slot(s), %s fluid tank(s)); "
-                        + "it works on its own.");
+                "It takes no item or fluid inputs (%s item slot(s), %s fluid tank(s)); it works on its own.");
         keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS,
-                "Outputs: %s item slot(s) and %s fluid tank(s). Collect the products here.");
+                "The products appear in the output slots (%s item slot(s), %s fluid tank(s)); collect them.");
         keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
-                "This machine produces no item or fluid outputs (%s item slot(s), %s fluid tank(s)).");
+                "It produces no item or fluid output (%s item slot(s), %s fluid tank(s)).");
         keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY,
-                "Energy: its voltage tier is %s. Connect a matching cable or generator.");
-        keys.put(SingleBlockUsageGenerator.NARRATION_PROGRESS,
-                "While a recipe runs the progress bar fills; if it stalls it is waiting for inputs or power.");
-        keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
-                "Covers mount on the machine's sides: conveyor (items), pump (fluids), machine controller "
-                        + "(auto I/O) and more.");
+                "It runs on %s power - connect a cable or generator of the matching tier.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY_NONE,
+                "It needs no power hookup - steam machines run on steam.");
         keys.put(SingleBlockUsageGenerator.NARRATION_PITFALLS,
-                "Common pitfalls: %s or higher voltage destroys the machine, and a full output slot stops "
-                        + "processing.");
+                "Common pitfalls: a full output or an empty input stalls processing, and the voltage tier "
+                        + "must match the machine.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_PITFALLS_NONE,
+                "Common pitfalls: a full output or an empty input stalls processing and freezes the progress bar.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
+                "Advanced: covers automate it - conveyor for items, pump for fluids, machine controller for auto I/O.");
         keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_INTRO,
                 "This is the Low Pressure Steam Furnace - a bronze-age smelter that runs on steam.");
         keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_USAGE,
@@ -371,6 +400,384 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
                 "This is the Basic Macerator - the LV workhorse that grinds ores into dusts.");
         keys.put(SingleBlockScenes.HAND_LV_MACERATOR_USAGE,
                 "Put ore in the input slot, give it LV power, and pull the dust from the output slot.");
+    }
+
+    /**
+     * 关键机器<b>手写教学解说</b>（工单 #18）：用途 / 怎么搭 / 输入 / 输出 / 供能 / 常见坑，中英双语。
+     * 键由 {@link MachineDescriptions} 的登记表推导（{@link MachineDescriptions#key}），生成器命中登记
+     * 表时优先使用，未命中回退结构化模板。文案事实以组织 fork 的 lang / 机器定义为准，不臆造格雷科技行为。
+     */
+    private static void curatedDescriptions(Map<String, String> keys, boolean chinese) {
+        if (chinese) {
+            // --- 多方块 ---------------------------------------------------------
+            desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.PURPOSE,
+                    "焦炉把煤炭炼成焦炭，同时副产杂酚油，是开局就能搭出来的第一台多方块。");
+            desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.SETUP,
+                    "用焦炉砖砌成 3x3x3 的空心方块并装上控制器即可成型；它既不需要通电，也不需要燃料。");
+            desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.INPUTS,
+                    "把煤炭从顶部或装料口放进中间的空腔。");
+            desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.OUTPUTS,
+                    "炼出的焦炭留在空腔里，杂酚油则存进机器自带的 32 桶内胆。");
+            desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.ENERGY,
+                    "它完全不用电，是蒸汽时代之前就能使用的原始机器。");
+            desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：结构必须全部用焦炉砖，仓口最多装 5 个焦炉仓口；杂酚油内胆只有 32 桶容量，满了要记得排空。");
+
+            desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.PURPOSE,
+                    "电力高炉能炼出铝合金、不锈钢、钛等高级材料，是中期最重要的熔炼设备。");
+            desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.SETUP,
+                    "它靠线圈提供温度：控制器通电后成型，线圈等级越高能达到的炉温越高。");
+            desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.INPUTS,
+                    "把矿石或原料从输入总线送进炉膛，也可以通入流体参与反应。");
+            desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.OUTPUTS,
+                    "成品从输出总线取出，另外还有灰烬可以通过消声仓回收。");
+            desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.ENERGY,
+                    "给能量输入仓接上对应等级的电力就能运行；电压等级越高，可支持的炉温也越高。");
+            desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：一定要装消声仓，而且它正前方要留一格空气，否则炉子会出问题；线圈等级不够就炼不了需要更高温度的配方。");
+
+            desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.PURPOSE,
+                    "大型化学反应釜用百分之百的能耗效率执行化学反应釜的配方，适合大规模化工。");
+            desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.SETUP,
+                    "成型的关键是正中心那根聚四氟乙烯管道旁边恰好放一块白铜线圈。");
+            desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.INPUTS,
+                    "原料从输入总线进入，最多能同时处理 3 种物品和 5 种流体。");
+            desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.OUTPUTS,
+                    "产物从输出总线取出，最多支持 3 种物品和 4 种流体。");
+            desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.ENERGY,
+                    "给能量输入仓接入电力即可；超频会同时提高速度和能耗。");
+            desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：白铜线圈必须恰好一块，多了少了都成型不了；开启环境危害时它还会要求安全的工作环境。");
+
+            desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.PURPOSE,
+                    "装配线是放大版的组装机，用来批量制造高级合成部件。");
+            desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.SETUP,
+                    "它由可重复的切片组成，5 到 16 节都能成型，线越长一次能处理的配方越多。");
+            desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.INPUTS,
+                    "输入总线要放在起始切片，最多能放进 16 种物品和 4 种流体。");
+            desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.OUTPUTS,
+                    "产物从另一端末尾的输出总线取出，一次只输出一种物品。");
+            desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.ENERGY,
+                    "给能量仓接入电力即可运行。");
+            desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：它带有研究槽，很多配方要先用扫描仪研究出数据才能做，所以要准备好数据仓。");
+
+            desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.PURPOSE,
+                    "超净间本身不加工东西，而是让放进去的机器能够执行需要无尘环境的配方。");
+            desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.SETUP,
+                    "它是一个 5x5x5 到 15x15x15 的密闭房间，天花板要铺洁净过滤方块。");
+            desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.INPUTS,
+                    "物品、流体和电力都通过墙上的直通仓、机壳或二极管进出。");
+            desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.OUTPUTS,
+                    "房间本身不产出物品，产物由里面的机器负责。");
+            desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.ENERGY,
+                    "它自己耗电很少：脏的时候约 30 EU/t，干净后约 4 EU/t。");
+            desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：门最多开 4 个；发电机、消声仓、钻机和原始机器太脏，不能放进房间里面。");
+
+            desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.PURPOSE,
+                    "蒸馏塔把原油这类流体分馏成多种产物，是石化产线和中后期的核心设备。");
+            desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.SETUP,
+                    "它由一截一截的塔节组成，每层都要留一个输出仓口，才能把不同馏分分开收集。");
+            desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.INPUTS,
+                    "原料流体从底层输入，一次处理一种流体。");
+            desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.OUTPUTS,
+                    "上方各层的输出仓口会分别吐出不同馏分，最多支持 12 种流体。");
+            desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.ENERGY,
+                    "给能量仓接入电力即可运行；塔越高能处理的配方越多。");
+            desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：从第二层开始，每层必须恰好有一个输出仓口，否则无法成型。");
+
+            desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.PURPOSE,
+                    "大型燃气涡轮烧掉可燃气体来发电，是 EV 时代的主力发电机。");
+            desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.SETUP,
+                    "它需要一块涡轮转子装在转子支架上，还要配上齿轮箱机壳和消声仓。");
+            desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.INPUTS,
+                    "把可燃气体从输入仓通进去。");
+            desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.OUTPUTS,
+                    "它只产出电力，没有物品或流体产物。");
+            desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.ENERGY,
+                    "它是 EV 级发电机，把能量输出仓接到电网上就能供电。");
+            desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：涡轮转子会磨损，耐久耗尽就必须更换；消声仓前方要留一格空气，否则涡轮受阻、效率骤降。");
+
+            desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.PURPOSE,
+                    "大型搅拌机把多种材料混成合金或混合物，适合大批量生产。");
+            desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.SETUP,
+                    "按结构页搭好外壳和输入输出口，通电即可成型。");
+            desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.INPUTS,
+                    "最多能同时投入 6 种物品和 2 种流体。");
+            desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.OUTPUTS,
+                    "混合好的产物从输出口取出，一般是 1 种物品或 1 种流体。");
+            desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.ENERGY,
+                    "接上对应等级的电力即可运行；装上并行控制仓还能一次处理更多。");
+            desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：原料种类超过上限时就搅拌不起来；并行仓能提升吞吐，但也会加大能耗。");
+
+            // --- 单方块 ---------------------------------------------------------
+            desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.PURPOSE,
+                    "基础研磨机把矿石磨成粉，是电力时代最常用的第一台加工机。");
+            desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.SETUP,
+                    "整台机器就是这一个方块，放下并接上电就能用。");
+            desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.INPUTS,
+                    "把矿石放进输入槽。");
+            desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.OUTPUTS,
+                    "磨好的粉从输出槽取出。");
+            desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.ENERGY,
+                    "它是 LV 机器，接上低压线缆或发电机即可。");
+            desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：LV 和 MV 的研磨机只有 1 个输出槽，出不了副产物；想要副产物要升级到 HV 以上。");
+
+            desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.PURPOSE,
+                    "基础离心机把混合的原料甩开、分离出不同成分，常用于提纯。");
+            desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.SETUP,
+                    "整台机器就是这一个方块，放下并接上电就能用。");
+            desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.INPUTS,
+                    "把要分离的物品或流体放进输入槽。");
+            desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.OUTPUTS,
+                    "分离出的成分从输出槽取出，最多能得到 6 种物品和 6 种流体。");
+            desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.ENERGY,
+                    "它是 LV 机器，接上低压线缆或发电机即可。");
+            desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：一次分离出的产物很多，输出槽满了就会停工，要记得及时清空。");
+
+            desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.PURPOSE,
+                    "基础压缩机把物品压成更致密的形式，比如把锭压成块。");
+            desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.SETUP,
+                    "整台机器就是这一个方块，放下并接上电就能用。");
+            desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.INPUTS,
+                    "把要压缩的物品放进输入槽。");
+            desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.OUTPUTS,
+                    "压好的产物从输出槽取出。");
+            desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.ENERGY,
+                    "它是 LV 机器，接上低压线缆或发电机即可。");
+            desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：别把它和聚爆压缩机搞混——那台是消耗炸药的多方块，专门用来做特殊材料。");
+
+            desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.PURPOSE,
+                    "基础搅拌机把多种原料混成合金或混合物。");
+            desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.SETUP,
+                    "整台机器就是这一个方块，放下并接上电就能用。");
+            desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.INPUTS,
+                    "最多能同时投入 6 种物品和 2 种流体。");
+            desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.OUTPUTS,
+                    "搅拌好的产物从输出槽取出。");
+            desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.ENERGY,
+                    "它是 LV 机器，接上低压线缆或发电机即可。");
+            desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：同时投入的原料种类有上限，配方需要更多种类时要改用大型搅拌机。");
+
+            desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.PURPOSE,
+                    "基础电解机用电把物品或流体分解成组成它的元素。");
+            desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.SETUP,
+                    "整台机器就是这一个方块，放下并接上电就能用。");
+            desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.INPUTS,
+                    "把要电解的物品或流体放进输入槽。");
+            desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.OUTPUTS,
+                    "分解出的元素从输出槽取出，最多能得到 6 种物品和 6 种流体。");
+            desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.ENERGY,
+                    "它是 LV 机器，接上低压线缆或发电机即可。");
+            desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.PITFALLS,
+                    "常见坑：电解产物种类多，输出槽很容易塞满，要留出足够的取出空间。");
+            return;
+        }
+
+        // --- Multiblocks --------------------------------------------------------
+        desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.PURPOSE,
+                "The Coke Oven turns coal into coke and yields creosote as a by-product - your first multiblock.");
+        desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.SETUP,
+                "Build a hollow 3x3x3 out of Coke Oven Bricks and fit the controller; it needs no power and no fuel.");
+        desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.INPUTS,
+                "Drop coal into the hollow center from the top or through a loading hatch.");
+        desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.OUTPUTS,
+                "The coke stays in the chamber and creosote collects in the machine's built-in 32-bucket tank.");
+        desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.ENERGY,
+                "It uses no power at all - a primitive machine from before the steam age.");
+        desc(keys, "gtceu:coke_oven", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: the structure must be all Coke Oven Bricks and at most 5 Coke Oven Hatches; "
+                        + "the creosote tank holds only 32 buckets, so drain it when full.");
+
+        desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.PURPOSE,
+                "The Electric Blast Furnace smelts advanced materials such as aluminium, stainless steel and "
+                        + "titanium - a key mid-game machine.");
+        desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.SETUP,
+                "It needs heating coils for temperature: power the controller to form it, and higher-tier coils "
+                        + "allow higher furnace temperatures.");
+        desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.INPUTS,
+                "Feed ores or ingredients through the input bus; fluids can also be piped in for the reaction.");
+        desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.OUTPUTS,
+                "Collect the products from the output bus; ash can be recovered through the muffler hatch.");
+        desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.ENERGY,
+                "Power the energy input hatch at the matching tier; a higher voltage supports higher furnace "
+                        + "temperatures.");
+        desc(keys, "gtceu:electric_blast_furnace", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: fit a muffler hatch with an air block in front of it, and low-tier coils "
+                        + "cannot reach the temperatures some recipes need.");
+
+        desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.PURPOSE,
+                "The Large Chemical Reactor runs Chemical Reactor recipes at 100% energy efficiency - built for "
+                        + "bulk chemistry.");
+        desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.SETUP,
+                "The key to forming it is exactly one Cupronickel Coil Block next to the PTFE pipe at the center.");
+        desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.INPUTS,
+                "Feed ingredients through the input bus - up to 3 items and 5 fluids at once.");
+        desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.OUTPUTS,
+                "Collect products from the output bus - up to 3 items and 4 fluids.");
+        desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.ENERGY,
+                "Power the energy input hatch; overclocking raises both speed and energy use.");
+        desc(keys, "gtceu:large_chemical_reactor", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: exactly one Cupronickel Coil is required - too many or too few will not form; "
+                        + "with environmental hazards enabled it also demands a safe environment.");
+
+        desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.PURPOSE,
+                "The Assembly Line is an oversized Assembler for mass-producing advanced crafting components.");
+        desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.SETUP,
+                "It is built from repeatable slices - 5 to 16 of them - and a longer line handles more recipes.");
+        desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.INPUTS,
+                "The input bus goes at the starting slice and takes up to 16 items and 4 fluids.");
+        desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.OUTPUTS,
+                "Products come out of the output bus at the far end - one item per craft.");
+        desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.ENERGY,
+                "Power the energy hatch to run it.");
+        desc(keys, "gtceu:assembly_line", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: it has a research slot, so many recipes need data researched first - bring a "
+                        + "data hatch.");
+
+        desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.PURPOSE,
+                "The Cleanroom does not process anything itself - it lets machines placed inside run "
+                        + "cleanroom-only recipes.");
+        desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.SETUP,
+                "It is a sealed room from 5x5x5 to 15x15x15, with Cleanroom Filter casings in the ceiling.");
+        desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.INPUTS,
+                "Items, fluids and power pass through passthrough hatches, Hulls or Diodes in the walls.");
+        desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.OUTPUTS,
+                "The room produces nothing itself; the machines inside do the work.");
+        desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.ENERGY,
+                "It draws very little power: about 30 EU/t while dirty and about 4 EU/t once clean.");
+        desc(keys, "gtceu:cleanroom", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: at most 4 doors, and generators, mufflers, drills and primitive machines are "
+                        + "too dirty to place inside.");
+
+        desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.PURPOSE,
+                "The Distillation Tower fractionates fluids like oil into many products - the heart of "
+                        + "petrochemistry.");
+        desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.SETUP,
+                "It is built from repeated tower layers, and every layer needs its own output hatch so each "
+                        + "fraction can be collected separately.");
+        desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.INPUTS,
+                "Feed the source fluid in at the bottom - one fluid at a time.");
+        desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.OUTPUTS,
+                "Each upper layer's output hatch yields a different fraction - up to 12 fluids.");
+        desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.ENERGY,
+                "Power the energy hatch; a taller tower can run more recipes.");
+        desc(keys, "gtceu:distillation_tower", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: starting from the second layer, every layer must have exactly one output "
+                        + "hatch or it will not form.");
+
+        desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.PURPOSE,
+                "The Large Gas Turbine burns flammable gas to produce EU - a mainstay generator of the EV age.");
+        desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.SETUP,
+                "It needs a turbine rotor in the rotor holder, plus gearbox casings and a muffler hatch.");
+        desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.INPUTS,
+                "Feed flammable gas into the input hatch.");
+        desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.OUTPUTS,
+                "It only produces EU - no item or fluid output.");
+        desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.ENERGY,
+                "It is an EV-tier generator; hook the output energy hatch to your grid.");
+        desc(keys, "gtceu:gas_large_turbine", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: the turbine rotor wears out and must be replaced; leave an air block in front "
+                        + "of the muffler or the turbine face gets obstructed and efficiency drops.");
+
+        desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.PURPOSE,
+                "The Large Mixer blends materials into alloys and mixtures, made for bulk production.");
+        desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.SETUP,
+                "Build the casing and I/O hatches as shown; power it to form.");
+        desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.INPUTS,
+                "It accepts up to 6 items and 2 fluids at once.");
+        desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.OUTPUTS,
+                "Collect the mixture from the output - usually one item or one fluid.");
+        desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.ENERGY,
+                "Power it at the matching tier; adding a parallel control hatch processes more at once.");
+        desc(keys, "gtceu:large_mixer", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: too many ingredient types will stall it; a parallel hatch boosts throughput "
+                        + "but also energy use.");
+
+        // --- Single blocks ------------------------------------------------------
+        desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.PURPOSE,
+                "The Basic Macerator grinds ores into dusts - the first workhorse of the electric age.");
+        desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.SETUP,
+                "The whole machine is this one block; place it and power it to use it.");
+        desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.INPUTS,
+                "Put the ore into the input slot.");
+        desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.OUTPUTS,
+                "Take the dust from the output slot.");
+        desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.ENERGY,
+                "It is an LV machine - connect a low-voltage cable or generator.");
+        desc(keys, "gtceu:lv_macerator", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: LV and MV macerators have only one output slot and cannot produce by-products "
+                        + "- go HV or higher for those.");
+
+        desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.PURPOSE,
+                "The Basic Centrifuge spins mixed materials apart to separate their components.");
+        desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.SETUP,
+                "The whole machine is this one block; place it and power it to use it.");
+        desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.INPUTS,
+                "Put the item or fluid to separate into the input.");
+        desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.OUTPUTS,
+                "Collect the separated parts from the outputs - up to 6 items and 6 fluids.");
+        desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.ENERGY,
+                "It is an LV machine - connect a low-voltage cable or generator.");
+        desc(keys, "gtceu:lv_centrifuge", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: separation yields many outputs, so a full output slot stalls it - keep them "
+                        + "cleared.");
+
+        desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.PURPOSE,
+                "The Basic Compressor squeezes items into denser forms, such as turning ingots into blocks.");
+        desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.SETUP,
+                "The whole machine is this one block; place it and power it to use it.");
+        desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.INPUTS,
+                "Put the item to compress into the input slot.");
+        desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.OUTPUTS,
+                "Take the compressed product from the output slot.");
+        desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.ENERGY,
+                "It is an LV machine - connect a low-voltage cable or generator.");
+        desc(keys, "gtceu:lv_compressor", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: do not confuse it with the Implosion Compressor - that is an "
+                        + "explosive-consuming multiblock for special materials.");
+
+        desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.PURPOSE,
+                "The Basic Mixer blends several ingredients into alloys or mixtures.");
+        desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.SETUP,
+                "The whole machine is this one block; place it and power it to use it.");
+        desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.INPUTS,
+                "It accepts up to 6 items and 2 fluids at once.");
+        desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.OUTPUTS,
+                "Take the mixture from the output slot.");
+        desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.ENERGY,
+                "It is an LV machine - connect a low-voltage cable or generator.");
+        desc(keys, "gtceu:lv_mixer", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: there is a cap on ingredient types; recipes needing more should use the "
+                        + "Large Mixer.");
+
+        desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.PURPOSE,
+                "The Basic Electrolyzer uses electricity to break items or fluids down into their elements.");
+        desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.SETUP,
+                "The whole machine is this one block; place it and power it to use it.");
+        desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.INPUTS,
+                "Put the item or fluid to electrolyze into the input.");
+        desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.OUTPUTS,
+                "Collect the elements from the outputs - up to 6 items and 6 fluids.");
+        desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.ENERGY,
+                "It is an LV machine - connect a low-voltage cable or generator.");
+        desc(keys, "gtceu:lv_electrolyzer", MachineDescriptions.Field.PITFALLS,
+                "Common pitfalls: electrolysis yields many products, so the outputs fill up quickly - leave "
+                        + "room to collect them.");
+    }
+
+    /** 写入一条手写说明键（键由 {@link MachineDescriptions} 推导）。 */
+    private static void desc(Map<String, String> keys, String machineId, MachineDescriptions.Field field,
+            String text) {
+        keys.put(MachineDescriptions.key(machineId, field), text);
     }
 
     /**

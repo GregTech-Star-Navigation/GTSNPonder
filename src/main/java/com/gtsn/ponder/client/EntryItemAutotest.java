@@ -79,8 +79,8 @@ public final class EntryItemAutotest {
     private static final String HOVER_TARGET = "gtceu:lp_steam_furnace";
     /** 旁白本地化目标：带仓口 / 总线的大型多方块（强制自动生成，故旁白含机器名与角色名）。 */
     private static final String NARRATION_TARGET = "gtceu:large_combustion_engine";
-    /** 单方块使用场景旁白本地化目标（工单 #17 缺陷 B）：机器名 / 层级 / 配方类型均须本地化。 */
-    private static final String SINGLE_BLOCK_TARGET = "gtceu:lv_centrifuge";
+    /** 单方块使用场景旁白本地化目标（工单 #17 缺陷 B + #18）：机器名 / 层级 / 配方类型均须本地化。 */
+    private static final String SINGLE_BLOCK_TARGET = "gtceu:lv_electric_furnace";
 
     private static final String HOVER_SCREENSHOT = "gtsnponder-entryitem-hover.png";
     /** 按键<b>之前</b>的背包截图：证明默认键触发时光标确实悬停在目标槽位上（缺陷 C 的直接证据）。 */
@@ -443,7 +443,7 @@ public final class EntryItemAutotest {
         if (player.renderedFrames() < 4) {
             return;
         }
-        seekToStep(player, "intro");
+        seekToStep(player, "text.purpose");
         if (!assertUsageNarrationLocalized(minecraft, player, "zh")) {
             return;
         }
@@ -536,7 +536,7 @@ public final class EntryItemAutotest {
         if (player.renderedFrames() < 4) {
             return;
         }
-        seekToStep(player, "intro");
+        seekToStep(player, "text.purpose");
         if (!assertUsageNarrationLocalized(minecraft, player, "en")) {
             return;
         }
@@ -616,9 +616,9 @@ public final class EntryItemAutotest {
     }
 
     /**
-     * 断言单方块使用场景旁白已本地化（工单 #17 缺陷 B）：不含任何 {@code gtceu:} 原始注册名，且含本地化的
-     * 机器名（GT 方块名键）、层级名（层级键）与配方类型名（配方类型键）。后缀从场景自身的 intro 参数推导，
-     * 不硬编码文案。
+     * 断言单方块使用场景旁白已本地化（工单 #17 缺陷 B + #18）：不含任何 {@code gtceu:} 原始注册名，
+     * 且含本地化的机器名（GT 方块名键）；结构化模板路径下再校验层级名与配方类型名。机器名从场景自身的
+     * {@code target} 推导（不依赖 intro 参数），故「手写用途」与「模板用途」两条路径都能覆盖。
      */
     private static boolean assertUsageNarrationLocalized(Minecraft minecraft, ScenePlayerScreen player,
             String locale) {
@@ -631,37 +631,36 @@ public final class EntryItemAutotest {
             fail(minecraft, locale + " single-block usage narration still shows a raw gtceu: id: " + text);
             return false;
         }
-        SceneStep intro = player.scene().steps().stream()
-                .filter(step -> "intro".equals(step.id())).findFirst().orElse(null);
-        if (intro == null) {
-            fail(minecraft, "the single-block usage scene has no intro step");
+        SceneStep purpose = player.scene().steps().stream()
+                .filter(step -> "text.purpose".equals(step.id())).findFirst().orElse(null);
+        if (purpose == null) {
+            fail(minecraft, "the single-block usage scene has no purpose step");
             return false;
         }
-        List<String> args = intro.narrationArgs();
-        if (args.size() < 3) {
-            fail(minecraft, "the single-block usage intro does not carry machine / tier / recipe args: " + args);
-            return false;
-        }
-        String machineName = Component.translatable(SingleBlockUsageGenerator.titleKeyFor(args.get(0))).getString();
+        String machineName = Component.translatable(
+                SingleBlockUsageGenerator.titleKeyFor(player.scene().target())).getString();
         if (!text.contains(machineName)) {
             fail(minecraft, locale + " single-block narration lacks the localized machine name '"
                     + machineName + "': " + text);
             return false;
         }
-        String tierName = Component.translatable(GeneratedKeys.tierKey(args.get(1))).getString();
-        if (!text.contains(tierName)) {
-            fail(minecraft, locale + " single-block narration lacks the localized tier name '"
-                    + tierName + "' (raw arg was '" + args.get(1) + "'): " + text);
-            return false;
-        }
-        String recipeTypes = args.get(2);
-        if (recipeTypes.contains(":")) {
-            String firstRecipeType = recipeTypes.split(NarrationLocalization.LIST_SEPARATOR, -1)[0];
-            String recipeName = Component.translatable(GeneratedKeys.recipeTypeKey(firstRecipeType)).getString();
-            if (!text.contains(recipeName)) {
-                fail(minecraft, locale + " single-block narration lacks the localized recipe type name '"
-                        + recipeName + "' (raw arg was '" + firstRecipeType + "'): " + text);
+        List<String> args = purpose.narrationArgs();
+        if (args.size() >= 3) {
+            String tierName = Component.translatable(GeneratedKeys.tierKey(args.get(1))).getString();
+            if (!text.contains(tierName)) {
+                fail(minecraft, locale + " single-block narration lacks the localized tier name '"
+                        + tierName + "' (raw arg was '" + args.get(1) + "'): " + text);
                 return false;
+            }
+            String recipeTypes = args.get(2);
+            if (recipeTypes.contains(":")) {
+                String firstRecipeType = recipeTypes.split(NarrationLocalization.LIST_SEPARATOR, -1)[0];
+                String recipeName = Component.translatable(GeneratedKeys.recipeTypeKey(firstRecipeType)).getString();
+                if (!text.contains(recipeName)) {
+                    fail(minecraft, locale + " single-block narration lacks the localized recipe type name '"
+                            + recipeName + "' (raw arg was '" + firstRecipeType + "'): " + text);
+                    return false;
+                }
             }
         }
         LOGGER.info("[GTSNPonder] entryitem autotest single-block usage narration [{}]: {}", locale, text);
@@ -669,8 +668,9 @@ public final class EntryItemAutotest {
     }
 
     /**
-     * 断言成型旁白已本地化（缺陷 A1/A2/A3）：不含原始注册 id、不含任何角色枚举名、含本地化机器名
-     * （有仓口时还需含至少一个本地化角色名）、尺寸段为<b>半角</b>括号且不含全角括号。
+     * 断言成型旁白已本地化（缺陷 A1/A2/A3）：不含原始注册 id、不含任何角色枚举名、含本地化机器名、
+     * 尺寸段为<b>半角</b>括号且不含全角括号。随后 seek 到「输入」步，断言自然表述里出现了本地化的仓口
+     * 角色名（工单 #18：角色信息从「数量枚举」改为自然语句，本地化要求不变）。
      */
     private static boolean assertLocalizedNarration(Minecraft minecraft, ScenePlayerScreen player, String locale) {
         String text = player.narrationText().text();
@@ -696,16 +696,6 @@ public final class EntryItemAutotest {
                     + title + "': " + text);
             return false;
         }
-        if (!player.structure().hatches().isEmpty()) {
-            boolean anyRole = Arrays.stream(StructureRole.values())
-                    .filter(StructureRole::isHatch)
-                    .map(role -> Component.translatable(GeneratedKeys.roleKey(role.name())).getString())
-                    .anyMatch(text::contains);
-            if (!anyRole) {
-                fail(minecraft, locale + " narration does not show any localized hatch role name: " + text);
-                return false;
-            }
-        }
         String size = player.structure().sizeX() + "x" + player.structure().sizeY()
                 + "x" + player.structure().sizeZ();
         if (!text.contains("(" + size + ")")) {
@@ -717,7 +707,23 @@ public final class EntryItemAutotest {
             fail(minecraft, locale + " narration still contains a fullwidth parenthesis (font-broken): " + text);
             return false;
         }
-        LOGGER.info("[GTSNPonder] entryitem autotest narration [{}]: {}", locale, text);
+        LOGGER.info("[GTSNPonder] entryitem autotest formed narration [{}]: {}", locale, text);
+
+        if (!player.structure().hatches().isEmpty()) {
+            seekToStep(player, "text.inputs");
+            String inputsText = player.narrationText().text();
+            boolean anyRole = Arrays.stream(StructureRole.values())
+                    .filter(StructureRole::isHatch)
+                    .map(role -> Component.translatable(GeneratedKeys.roleKey(role.name())).getString())
+                    .anyMatch(inputsText::contains);
+            if (!anyRole) {
+                fail(minecraft, locale + " inputs narration does not show any localized hatch role name: "
+                        + inputsText);
+                return false;
+            }
+            LOGGER.info("[GTSNPonder] entryitem autotest role-localized inputs narration [{}]: {}",
+                    locale, inputsText);
+        }
         return true;
     }
 

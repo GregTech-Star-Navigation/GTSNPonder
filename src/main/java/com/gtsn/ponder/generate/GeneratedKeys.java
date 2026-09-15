@@ -28,6 +28,13 @@ public final class GeneratedKeys {
      */
     public static final String TIER_PREFIX = "ponder.gtsnponder.tier.";
 
+    /**
+     * 旁白模板参数中「列表分隔符」的本地化键（工单 #18）：自动旁白把仓口角色 / 配方类型等以
+     * {@code ", "} 连接成一个参数（生成器与语言无关）。渲染前 {@code NarrationLocalization} 把该
+     * 分隔符解析为本键，使中文显示顿号「、」、英文显示逗号「, 」，避免中文旁白出现半角逗号堆砌。
+     */
+    public static final String LIST_SEPARATOR = "ponder.gtsnponder.narration.list_separator";
+
     /** 常驻颜色图例的本地化键。 */
     public static final String LEGEND_TITLE = "ponder.gtsnponder.legend.title";
     public static final String LEGEND_CONTROLLER = "ponder.gtsnponder.legend.controller";

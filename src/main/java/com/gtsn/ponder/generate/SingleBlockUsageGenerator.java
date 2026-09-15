@@ -24,14 +24,20 @@ import java.util.Objects;
  * 进度 + 覆盖板 + 常见坑（概念旁白）。因此本生成器<b>不产生</b> {@code build.layer/role}、
  * {@code installModule} 或 {@code formedPulse} 步骤，而是揭示机器本体后逐条讲解使用方式。</p>
  *
+ * <h2>分步教学模式（工单 #18）</h2>
+ * <p>旁白按<b>固定教学顺序</b>分步，每步一句完整人话：<b>用途</b> → <b>搭建 / 本体</b> →
+ * <b>输入什么</b> → <b>输出什么</b> → <b>供能与层级</b> → <b>常见坑</b> + 进阶（覆盖板）。关键机器
+ * （{@link MachineDescriptions}）命中手写解说，其余走结构化模板（仍是无原始 {@code gtceu:} id、
+ * 无枚举名堆砌的完整句子）。</p>
+ *
  * <h2>可播放性</h2>
  * <p>机器本体以 1×1×1 的 {@link StructureSource} 表达（{@link #structureOf}）：唯一方块即机器方块，
  * 同时是控制器单元。场景只声明一个元素 {@code machine}（选择器 {@code all}，在 1×1×1 结构上恒等于
  * 机器本体），故世界桥 / 元素解析器无需任何新选择器即可渲染与高亮它（封闭词汇不变）。</p>
  *
  * <h2>文案</h2>
- * <p>全部旁白走本地化键（{@code NARRATION_USAGE_*}），并携带 {@code narrationArgs} 模板参数
- * （机器名 / 等级 / 配方类型 / 槽位与罐数），使同一模板产出机器特定文案；键随 datagen 批量产出中英
+ * <p>全部旁白走本地化键（{@code NARRATION_*}），并携带 {@code narrationArgs} 模板参数（机器名 /
+ * 等级 / 配方类型 / 槽位与罐数），使同一模板产出机器特定文案；键随 datagen 批量产出中英
  * （见 {@code com.gtsn.ponder.datagen}）。场景 {@code title} 复用 GT 自身的方块名键
  * （{@link #titleKeyFor}，{@code block.<ns>.<path>}），故任意单方块机器都有本地化标题，无需额外枚举。</p>
  *
@@ -44,7 +50,7 @@ import java.util.Objects;
 public final class SingleBlockUsageGenerator {
 
     /** 生成器版本：产物可重生成 / 可 diff 的标识（写入 {@code generatorVersion}）。 */
-    public static final String GENERATOR_VERSION = "usage-1";
+    public static final String GENERATOR_VERSION = "usage-2";
 
     /** 单方块使用场景 id 前缀（后缀为清洗后的目标 id）；目录 / 进度键与产物 id 共用此推导。 */
     public static final String SCENE_ID_PREFIX = "gtsnponder:usage_";
@@ -52,19 +58,21 @@ public final class SingleBlockUsageGenerator {
     /** 机器本体元素 ID（单方块结构上选择器 {@code all} 恒等于机器方块）。 */
     public static final String ELEMENT_MACHINE = "machine";
 
-    /** 旁白键（自动文案经 datagen 批量产出）。参数见各步骤 narrationArgs。 */
-    public static final String NARRATION_INTRO = "ponder.gtsnponder.generated.usage.intro";
-    public static final String NARRATION_MACHINE = "ponder.gtsnponder.generated.usage.machine";
+    /** 教学模式旁白键（固定顺序：用途 → 本体 → 输入 → 输出 → 供能 → 常见坑 + 进阶）。 */
+    public static final String NARRATION_PURPOSE = "ponder.gtsnponder.generated.usage.purpose";
+    public static final String NARRATION_SETUP = "ponder.gtsnponder.generated.usage.setup";
     public static final String NARRATION_INPUTS = "ponder.gtsnponder.generated.usage.inputs";
     public static final String NARRATION_INPUTS_NONE = "ponder.gtsnponder.generated.usage.inputs.none";
     public static final String NARRATION_OUTPUTS = "ponder.gtsnponder.generated.usage.outputs";
     public static final String NARRATION_OUTPUTS_NONE = "ponder.gtsnponder.generated.usage.outputs.none";
     public static final String NARRATION_ENERGY = "ponder.gtsnponder.generated.usage.energy";
-    public static final String NARRATION_PROGRESS = "ponder.gtsnponder.generated.usage.progress";
-    public static final String NARRATION_COVERS = "ponder.gtsnponder.generated.usage.covers";
+    public static final String NARRATION_ENERGY_NONE = "ponder.gtsnponder.generated.usage.energy.none";
     public static final String NARRATION_PITFALLS = "ponder.gtsnponder.generated.usage.pitfalls";
+    public static final String NARRATION_PITFALLS_NONE = "ponder.gtsnponder.generated.usage.pitfalls.none";
+    /** 进阶：覆盖板 / 自动化（教学顺序之外的补充一步）。 */
+    public static final String NARRATION_COVERS = "ponder.gtsnponder.generated.usage.covers";
 
-    private static final int INTRO_TEXT_DURATION = 50;
+    private static final int PURPOSE_TEXT_DURATION = 55;
     private static final int TEXT_DURATION = 50;
     private static final int SHOW_DURATION = 12;
     private static final int HIGHLIGHT_DURATION = 30;
@@ -124,8 +132,9 @@ public final class SingleBlockUsageGenerator {
                 .duration(SHOW_DURATION)
                 .targets(List.of(ELEMENT_MACHINE))
                 .build());
-        steps.add(text("intro", NARRATION_INTRO, INTRO_TEXT_DURATION,
-                List.of(source.id(), tierText(source), recipeTypesText(source))));
+
+        // ① 用途（手写优先，否则「这是 <机器名>，一台 <等级> 的机器，处理 <配方> 配方」）。
+        steps.add(purposeNarration(source));
         steps.add(SceneStep.builder()
                 .id("highlight.machine")
                 .type(StepType.HIGHLIGHT)
@@ -133,15 +142,14 @@ public final class SingleBlockUsageGenerator {
                 .targets(List.of(ELEMENT_MACHINE))
                 .param("visible", Boolean.TRUE)
                 .build());
-        steps.add(text("text.machine", NARRATION_MACHINE, TEXT_DURATION, List.of(source.id())));
-        steps.add(text("text.inputs", inputsKey(source), TEXT_DURATION,
-                List.of(String.valueOf(source.itemInputs()), String.valueOf(source.fluidInputs()))));
-        steps.add(text("text.outputs", outputsKey(source), TEXT_DURATION,
-                List.of(String.valueOf(source.itemOutputs()), String.valueOf(source.fluidOutputs()))));
-        steps.add(text("text.energy", NARRATION_ENERGY, TEXT_DURATION, List.of(tierText(source))));
-        steps.add(text("text.progress", NARRATION_PROGRESS, TEXT_DURATION, List.of()));
+
+        // ② 搭建 / 本体 → ③ 输入 → ④ 输出 → ⑤ 供能 → ⑥ 常见坑 → 进阶（覆盖板）。
+        steps.add(setupNarration(source));
+        steps.add(inputsNarration(source));
+        steps.add(outputsNarration(source));
+        steps.add(energyNarration(source));
+        steps.add(pitfallsNarration(source));
         steps.add(text("text.covers", NARRATION_COVERS, TEXT_DURATION, List.of()));
-        steps.add(text("text.pitfalls", NARRATION_PITFALLS, TEXT_DURATION, List.of(tierText(source))));
 
         return SceneData.builder()
                 .formatVersion(SceneDataParser.CURRENT_FORMAT_VERSION)
@@ -180,15 +188,79 @@ public final class SingleBlockUsageGenerator {
                 .build();
     }
 
-    /** 输入旁白：有物品 / 流体输入走通用键，否则走「无输入」键（明确表达退化，不误导）。 */
-    private static String inputsKey(SingleBlockMachineSource source) {
-        return source.itemInputs() > 0 || source.fluidInputs() > 0 ? NARRATION_INPUTS : NARRATION_INPUTS_NONE;
+    private static boolean curated(SingleBlockMachineSource source) {
+        return MachineDescriptions.isCurated(source.id());
     }
 
-    /** 输出旁白：有物品 / 流体输出走通用键，否则走「无输出」键。 */
-    private static String outputsKey(SingleBlockMachineSource source) {
-        return source.itemOutputs() > 0 || source.fluidOutputs() > 0
+    private static String curatedKey(SingleBlockMachineSource source, MachineDescriptions.Field field) {
+        return MachineDescriptions.key(source.id(), field);
+    }
+
+    /** ① 用途：手写优先，否则「这是 <机器名>，一台 <等级> 的机器，处理 <配方> 配方」。 */
+    private static SceneStep purposeNarration(SingleBlockMachineSource source) {
+        if (curated(source)) {
+            return text("text.purpose", curatedKey(source, MachineDescriptions.Field.PURPOSE),
+                    PURPOSE_TEXT_DURATION, List.of());
+        }
+        return text("text.purpose", NARRATION_PURPOSE, PURPOSE_TEXT_DURATION,
+                List.of(source.id(), tierText(source), recipeTypesText(source)));
+    }
+
+    /** ② 搭建 / 本体：手写优先，否则「整台机器就是这一个方块」。 */
+    private static SceneStep setupNarration(SingleBlockMachineSource source) {
+        if (curated(source)) {
+            return text("text.setup", curatedKey(source, MachineDescriptions.Field.SETUP), TEXT_DURATION,
+                    List.of());
+        }
+        return text("text.setup", NARRATION_SETUP, TEXT_DURATION, List.of(source.id()));
+    }
+
+    /** ③ 输入：手写优先，否则按物品 / 流体输入计数自然叙述（无输入时明确说明）。 */
+    private static SceneStep inputsNarration(SingleBlockMachineSource source) {
+        if (curated(source)) {
+            return text("text.inputs", curatedKey(source, MachineDescriptions.Field.INPUTS), TEXT_DURATION,
+                    List.of());
+        }
+        String key = source.itemInputs() > 0 || source.fluidInputs() > 0
+                ? NARRATION_INPUTS : NARRATION_INPUTS_NONE;
+        return text("text.inputs", key, TEXT_DURATION,
+                List.of(String.valueOf(source.itemInputs()), String.valueOf(source.fluidInputs())));
+    }
+
+    /** ④ 输出：手写优先，否则按物品 / 流体输出计数自然叙述（无输出时明确说明）。 */
+    private static SceneStep outputsNarration(SingleBlockMachineSource source) {
+        if (curated(source)) {
+            return text("text.outputs", curatedKey(source, MachineDescriptions.Field.OUTPUTS), TEXT_DURATION,
+                    List.of());
+        }
+        String key = source.itemOutputs() > 0 || source.fluidOutputs() > 0
                 ? NARRATION_OUTPUTS : NARRATION_OUTPUTS_NONE;
+        return text("text.outputs", key, TEXT_DURATION,
+                List.of(String.valueOf(source.itemOutputs()), String.valueOf(source.fluidOutputs())));
+    }
+
+    /** ⑤ 供能与层级：手写优先，否则说清它用哪个电压 / 不接电。 */
+    private static SceneStep energyNarration(SingleBlockMachineSource source) {
+        if (curated(source)) {
+            return text("text.energy", curatedKey(source, MachineDescriptions.Field.ENERGY), TEXT_DURATION,
+                    List.of());
+        }
+        if (source.hasEnergy()) {
+            return text("text.energy", NARRATION_ENERGY, TEXT_DURATION, List.of(tierText(source)));
+        }
+        return text("text.energy", NARRATION_ENERGY_NONE, TEXT_DURATION, List.of());
+    }
+
+    /** ⑥ 常见坑：手写优先，否则过压 / 堵塞 / 缺料注意事项。 */
+    private static SceneStep pitfallsNarration(SingleBlockMachineSource source) {
+        if (curated(source)) {
+            return text("text.pitfalls", curatedKey(source, MachineDescriptions.Field.PITFALLS),
+                    TEXT_DURATION, List.of());
+        }
+        if (source.hasEnergy()) {
+            return text("text.pitfalls", NARRATION_PITFALLS, TEXT_DURATION, List.of(tierText(source)));
+        }
+        return text("text.pitfalls", NARRATION_PITFALLS_NONE, TEXT_DURATION, List.of());
     }
 
     private static String tierText(SingleBlockMachineSource source) {
