@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 
 import java.util.Optional;
@@ -52,8 +53,13 @@ public final class GtMachineUiProbe {
         return Optional.of(pos);
     }
 
-    /** {@code pos} 处是否已有可用的 GT 机器（方块实体已创建）。 */
-    public static boolean machinePresent(ServerLevel level, BlockPos pos) {
+    /**
+     * {@code pos} 处是否已有可用的 GT 机器（方块实体已创建）。接受任意 {@link Level}，故客户端
+     * （{@code ClientLevel}）与服务端（{@code ServerLevel}）皆可探测——自动测试用它确认「打开 GUI 前
+     * 客户端已持有机器方块实体」，因为 GT 的 {@code MachineUIFactory.readHolderFromSyncData} 在客户端
+     * 正是从<b>客户端</b>世界的方块实体解析 UI holder。
+     */
+    public static boolean machinePresent(Level level, BlockPos pos) {
         if (level == null || pos == null) {
             return false;
         }

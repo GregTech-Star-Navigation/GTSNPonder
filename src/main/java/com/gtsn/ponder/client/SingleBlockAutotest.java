@@ -47,9 +47,11 @@ import java.util.Optional;
  *   <li>标题界面：固定窗口 1280x720 + GUI 缩放 2，创建 / 载入固定存档；</li>
  *   <li>世界就绪后断言覆盖契约 {@link SingleBlockScenes#analyze}：代表性单方块机器零死链 + 精选手作齐全，
  *       并断言目录为代表性机器合成了使用场景条目（键 = 使用场景 id）；</li>
- *   <li>放置一台真实单方块机器（{@code gtceu:lp_steam_furnace}）并以 GT 标准路径打开其 GUI；断言
- *       {@link GtMachineScreenAdapter#resolveTarget} 解析出该机器 id（<b>失败可检出</b>：修复前单方块
- *       返回空 → 无按钮）；断言覆盖按钮已被真实渲染循环登记；截图；</li>
+ *   <li>放置一台真实单方块机器（{@code gtceu:lp_steam_furnace}），待<b>客户端</b>已持有该机器方块实体后
+ *       以 GT 标准路径打开其 GUI（去竞态：GT 在客户端从客户端世界的方块实体解析 UI holder，过早打开会
+ *       被静默丢弃），并在有界窗口内重试直到 {@link GtMachineScreenAdapter#resolveTarget} 解析出该机器
+ *       id（<b>失败可检出</b>：修复前单方块返回空 → 无按钮；超时则带屏类 / 时长 FAIL）；断言覆盖按钮已被
+ *       真实渲染循环登记；截图；</li>
  *   <li>经 Forge 事件总线投递真实 {@code ScreenEvent.MouseButtonPressed.Pre}，断言事件被取消、
  *       覆盖层记录一次点击 / 一次打开，且打开的播放屏 target 一致（手作场景 source=hand）；</li>
  *   <li>断言场景播放到期望的手作旁白键、旁白框非空；截图；</li>
@@ -83,6 +85,14 @@ public final class SingleBlockAutotest {
     private static final int WORLD_TIMEOUT_TICKS = 3600;
     private static final int STAGE_TIMEOUT_TICKS = 1200;
 
+    /**
+     * 打开 GT 机器 GUI 的有界等待窗口（tick）。远小于通用 {@link #STAGE_TIMEOUT_TICKS}：正常约 1 秒
+     * 内即可解析；窗口只用于覆盖客户端方块同步 + 打开包的竞态，超时仍会 FAIL（失败可检出）。
+     */
+    private static final int OPEN_TIMEOUT_TICKS = 300;
+    /** 打开请求的重试间隔（tick）：仅当客户端已持有机器且仍未解析出目标时重投一次。 */
+    private static final int UI_RETRY_INTERVAL_TICKS = 20;
+
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private enum Stage {
@@ -95,6 +105,8 @@ public final class SingleBlockAutotest {
     private static BlockPos machinePos;
     private static volatile boolean placed;
     private static volatile boolean uiRequested;
+    private static int uiOpenAttempts;
+    private static int nextOpenRequestTick;
     private static String target;
     private static boolean narrationSeen;
 
@@ -216,34 +228,75 @@ public final class SingleBlockAutotest {
             fail(minecraft, "could not place " + MACHINE_ID + " at " + pos);
             return;
         }
+        LOGGER.info("[GTSNPonder] singleblock autotest: placed {} at {}; opening its GT GUI once the "
+                + "client holds the machine", MACHINE_ID, pos);
+        stage = Stage.OPEN;
+        ticks = 0;
+        uiOpenAttempts = 0;
+        nextOpenRequestTick = 0;
+    }
+
+    /**
+     * 等待并断言真实单方块机器屏解析出 {@link #MACHINE_ID}。
+     *
+     * <p><b>去竞态</b>：GT 的 {@code MachineUIFactory.readHolderFromSyncData} 在客户端是从<b>客户端</b>
+     * 世界的方块实体解析 UI holder 的。若打开包在客户端尚未应用该方块更新、尚未创建
+     * {@code MetaMachineBlockEntity} 时到达，holder 解析为空，该次打开被静默丢弃，此后
+     * {@link GtMachineScreenAdapter#resolveTarget} 会在整个等待窗口内恒为空（历史偶发失败）。
+     * 故这里只在客户端<b>已持有机器</b>时才（重新）投递打开请求，并在有界窗口内以固定间隔重试，直到
+     * 解析成功；超时则以屏类 + 已用时长 + 尝试次数 FAIL。</p>
+     */
+    private static void tickOpen(Minecraft minecraft) {
+        Optional<String> resolved = GtMachineScreenAdapter.resolveTarget(minecraft.screen);
+        if (resolved.isPresent()) {
+            if (!MACHINE_ID.equals(resolved.get())) {
+                fail(minecraft, "single-block machine screen resolved the wrong target: expected " + MACHINE_ID
+                        + " got " + resolved.get());
+                return;
+            }
+            target = resolved.get();
+            LOGGER.info("[GTSNPonder] singleblock autotest: real single-block machine screen detected, "
+                    + "ponder target '{}' (screen={}, openAttempts={})",
+                    target, minecraft.screen.getClass().getName(), uiOpenAttempts);
+            stage = Stage.VERIFY;
+            ticks = 0;
+            return;
+        }
+        boolean clientReady = clientMachinePresent(minecraft);
+        if (clientReady && ticks >= nextOpenRequestTick) {
+            requestOpenUi(minecraft);
+            nextOpenRequestTick = ticks + UI_RETRY_INTERVAL_TICKS;
+        }
+        if (ticks > OPEN_TIMEOUT_TICKS) {
+            fail(minecraft, "the real single-block machine GUI never resolved a ponder target within "
+                    + OPEN_TIMEOUT_TICKS + " ticks (~" + (OPEN_TIMEOUT_TICKS / 20) + "s elapsed): "
+                    + "uiRequested=" + uiRequested + ", openAttempts=" + uiOpenAttempts
+                    + ", clientMachinePresent=" + clientReady
+                    + ", screen=" + (minecraft.screen == null ? "null" : minecraft.screen.getClass().getName()));
+        }
+    }
+
+    /** 经 GT 标准路径请求打开机器 GUI（服务端线程执行；仅在客户端已持有机器时调用）。 */
+    private static void requestOpenUi(Minecraft minecraft) {
+        IntegratedServer server = minecraft.getSingleplayerServer();
+        ServerPlayer player = serverPlayer(minecraft);
+        BlockPos pos = machinePos;
+        if (server == null || player == null || pos == null) {
+            return;
+        }
+        ServerLevel level = player.serverLevel();
+        uiOpenAttempts++;
         server.execute(() -> {
             if (GtMachineUiProbe.machinePresent(level, pos)) {
                 uiRequested = GtMachineUiProbe.openMachineUi(level, pos, player);
             }
         });
-        stage = Stage.OPEN;
-        ticks = 0;
     }
 
-    private static void tickOpen(Minecraft minecraft) {
-        Optional<String> resolved = GtMachineScreenAdapter.resolveTarget(minecraft.screen);
-        if (resolved.isEmpty()) {
-            if (ticks > STAGE_TIMEOUT_TICKS) {
-                fail(minecraft, "the real single-block machine GUI never resolved a ponder target "
-                        + "(uiRequested=" + uiRequested + ", screen=" + minecraft.screen + ")");
-            }
-            return;
-        }
-        if (!MACHINE_ID.equals(resolved.get())) {
-            fail(minecraft, "single-block machine screen resolved the wrong target: expected " + MACHINE_ID
-                    + " got " + resolved.get());
-            return;
-        }
-        target = resolved.get();
-        LOGGER.info("[GTSNPonder] singleblock autotest: real single-block machine screen detected, "
-                + "ponder target '{}' (screen={})", target, minecraft.screen.getClass().getName());
-        stage = Stage.VERIFY;
-        ticks = 0;
+    /** 客户端是否已持有该机器的方块实体（GT 打开 GUI 时正是从客户端世界解析 holder）。 */
+    private static boolean clientMachinePresent(Minecraft minecraft) {
+        return minecraft.level != null && machinePos != null
+                && GtMachineUiProbe.machinePresent(minecraft.level, machinePos);
     }
 
     private static void tickVerify(Minecraft minecraft) {
