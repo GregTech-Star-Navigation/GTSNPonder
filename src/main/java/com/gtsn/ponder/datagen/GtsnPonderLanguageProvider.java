@@ -2,10 +2,12 @@ package com.gtsn.ponder.datagen;
 
 import com.gtsn.ponder.catalog.CatalogKeys;
 import com.gtsn.ponder.catalog.SceneCategories;
+import com.gtsn.ponder.catalog.SingleBlockScenes;
 import com.gtsn.ponder.content.SystemSceneKeys;
 import com.gtsn.ponder.editor.EditorKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import com.gtsn.ponder.gt.GtMultiblockCatalog;
 
 import net.minecraft.data.PackOutput;
@@ -103,6 +105,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         editorKeys(keys, false);
         catalogKeys(keys, false);
         systemSceneKeys(keys, false);
+        usageSceneKeys(keys, false);
         return keys;
     }
 
@@ -154,6 +157,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         editorKeys(keys, true);
         catalogKeys(keys, true);
         systemSceneKeys(keys, true);
+        usageSceneKeys(keys, true);
         return keys;
     }
 
@@ -286,6 +290,76 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(SystemSceneKeys.LOGISTICS_COVERS,
                 "Covers mount on machines and pipes: conveyor (items), pump (fluids), machine controller "
                         + "(auto I/O) and more.");
+    }
+
+    /**
+     * 单方块机器「使用场景」（工单 #15）的文案键（中英双语）：使用流程模板（本体 / 输入 / 输出 /
+     * 能量 / 进度 / 覆盖板 / 常见坑）与两台精选手作机器的讲解。模板键集中定义在
+     * {@link SingleBlockUsageGenerator}，手作键集中在 {@link SingleBlockScenes}。
+     */
+    private static void usageSceneKeys(Map<String, String> keys, boolean chinese) {
+        if (chinese) {
+            keys.put(SingleBlockUsageGenerator.NARRATION_INTRO,
+                    "这是 %s（%s 级机器），配方类型：%s。下面讲解如何使用它。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_MACHINE,
+                    "%s 本身就是整台机器——所有部件都在这一个方块里。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS,
+                    "输入：%s 个物品槽、%s 个流体罐。把配方原料放进来。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS_NONE,
+                    "这台机器没有物品 / 流体输入（%s 个物品槽、%s 个流体罐），它只对自身工作。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS,
+                    "输出：%s 个物品槽、%s 个流体罐。从这里取出产物。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
+                    "这台机器没有物品 / 流体输出（%s 个物品槽、%s 个流体罐）。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY,
+                    "能量：它使用 %s 级电压。接上匹配的线缆或发电机即可供电。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_PROGRESS,
+                    "配方运行时进度条会填充；若停滞，说明在等待原料或电力。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
+                    "覆盖板可装在机器侧面：传送带（物品）、泵（流体）、机器控制器（自动进出）等。");
+            keys.put(SingleBlockUsageGenerator.NARRATION_PITFALLS,
+                    "常见坑：通入 %s 或更高电压会损坏机器；产物槽满则处理停止。");
+            keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_INTRO,
+                    "这是低压蒸汽熔炉——一台靠蒸汽驱动的青铜时代熔炉。");
+            keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_USAGE,
+                    "放入矿石或食物并供应充足的蒸汽：它一次熔炼一个物品，不需要电力线缆。");
+            keys.put(SingleBlockScenes.HAND_LV_MACERATOR_INTRO,
+                    "这是基础粉碎机——把矿石磨成粉的 LV 主力机器。");
+            keys.put(SingleBlockScenes.HAND_LV_MACERATOR_USAGE,
+                    "把矿石放进输入槽，通入 LV 电力，再从输出槽取出粉末。");
+            return;
+        }
+        keys.put(SingleBlockUsageGenerator.NARRATION_INTRO,
+                "This is %s (a %s machine). Recipe types: %s. Here is how to use it.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_MACHINE,
+                "%s is the machine itself - the whole machine fits in this one block.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS,
+                "Inputs: %s item slot(s) and %s fluid tank(s). Insert the recipe ingredients here.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS_NONE,
+                "This machine takes no item or fluid inputs (%s item slot(s), %s fluid tank(s)); "
+                        + "it works on its own.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS,
+                "Outputs: %s item slot(s) and %s fluid tank(s). Collect the products here.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
+                "This machine produces no item or fluid outputs (%s item slot(s), %s fluid tank(s)).");
+        keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY,
+                "Energy: it runs on %s power. Connect a matching cable or generator.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_PROGRESS,
+                "While a recipe runs the progress bar fills; if it stalls it is waiting for inputs or power.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
+                "Covers mount on the machine's sides: conveyor (items), pump (fluids), machine controller "
+                        + "(auto I/O) and more.");
+        keys.put(SingleBlockUsageGenerator.NARRATION_PITFALLS,
+                "Common pitfalls: %s or higher voltage destroys the machine, and a full output slot stops "
+                        + "processing.");
+        keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_INTRO,
+                "This is the Low Pressure Steam Furnace - a bronze-age smelter that runs on steam.");
+        keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_USAGE,
+                "Feed in ore or food and plenty of steam: it smelts one item at a time and needs no power cable.");
+        keys.put(SingleBlockScenes.HAND_LV_MACERATOR_INTRO,
+                "This is the Basic Macerator - the LV workhorse that grinds ores into dusts.");
+        keys.put(SingleBlockScenes.HAND_LV_MACERATOR_USAGE,
+                "Put ore in the input slot, give it LV power, and pull the dust from the output slot.");
     }
 
     /**

@@ -49,6 +49,7 @@
 
 - 每个元素必须是 JSON 对象；`id` 缺失 / 空白 → 拒绝。
 - `elements` 必须是数组（缺失即空）。
+- `params.selector` 是**封闭词汇**（`all`（缺省）/ `controller` / `block` / `layer` / `role` / `moduleslot`；语义见 `com.gtsn.ponder.bridge.SceneElementResolver`）。单方块机器「使用场景」（#15）把机器本体表达为 **1×1×1** 结构源并复用选择器 `all`（在该结构上恒等于机器本体），故 **v1 未新增选择器**；若未来确需新选择器（如 `self`），按「变更策略」开 issue / 落 ADR 后再加，只扩展封闭词汇、不改 schema 形状。
 
 ## `steps[]`：有序的步骤
 

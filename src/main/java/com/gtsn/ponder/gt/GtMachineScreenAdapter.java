@@ -2,7 +2,6 @@ package com.gtsn.ponder.gt;
 
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.machine.MetaMachine;
-import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
 
 import com.lowdragmc.lowdraglib.gui.modular.IUIHolder;
 import com.lowdragmc.lowdraglib.gui.modular.ModularUI;
@@ -28,11 +27,17 @@ import java.util.Optional;
  * <ol>
  *   <li>当前屏是 {@link ModularUIGuiContainer}，且其 {@code modularUI.holder} 是 {@link MetaMachine} →
  *       判定为 GT 机器屏（{@link #isMachineScreen(Screen)}）；</li>
- *   <li>该机器的 {@link MachineDefinition} 是 {@link MultiblockMachineDefinition} → 它是可「思索」的
- *       多方块，返回其注册 id（如 {@code gtceu:coke_oven}）作为思索目标（{@link #resolveTarget(Screen)}）。
- *       单方块机器 / 覆盖层 / 物品 UI 等同样走 LDLib 屏，但无结构可思索，故<b>不</b>返回目标、不显按钮。</li>
+ *   <li>该机器的 {@link MachineDefinition}（多方块<b>或单方块</b>）→ 返回其注册 id（如
+ *       {@code gtceu:coke_oven} / {@code gtceu:lp_steam_furnace}）作为思索目标
+ *       （{@link #resolveTarget(Screen)}）。工单 #15 起单方块机器也有「使用场景」，故不再限于多方块；
+ *       机器定义缺失 / id 缺失时才返回空。</li>
  * </ol>
  * <p>任何非 GT 屏（含 {@code null}）、无 holder、解析异常一律返回空 / {@code false}，绝不抛出。</p>
+ *
+ * <p><b>无可思索目标时的行为（工单 #15 决定）</b>：只要屏是 GT 机器屏就返回目标、绘制覆盖按钮；
+ * 若该目标最终解析不出场景（覆盖层点击 → {@code PonderEntrypoints.openForTarget} 返回 {@code false}），
+ * 则显示本地化的空态提示（{@code ponder.gtsnponder.message.no_scene}）且不消费这次点击。
+ * 即选择「绘制按钮 + 点击时给出本地化空态提示」而非「静默不绘制」。</p>
  *
  * <p><b>线程 / 端</b>：仅客户端加载。专职服务端不会引用本类，故 {@code net.minecraft.client} /
  * LDLib 客户端屏类型不会在服务端被加载（沿用「客户端类不在专职服务端加载」纪律）。</p>
@@ -48,8 +53,8 @@ public final class GtMachineScreenAdapter {
     }
 
     /**
-     * 解析当前 GT 机器屏的「思索」目标 id。仅当机器是<b>多方块</b>（可调用 {@link GtStructureAdapter} 生成结构）
-     * 时返回；否则空。用于覆盖层决定是否绘制按钮。
+     * 解析当前 GT 机器屏的「思索」目标 id：<b>任意 GT 机器</b>（多方块或单方块）都返回其定义 id，用于
+     * 覆盖层决定是否绘制按钮（工单 #15 起单方块机器也有「使用场景」）。机器定义缺失 / id 缺失时为空。
      */
     public static Optional<String> resolveTarget(Screen screen) {
         MetaMachine machine = metaMachineOf(screen);
@@ -62,7 +67,7 @@ public final class GtMachineScreenAdapter {
         } catch (RuntimeException failure) {
             return Optional.empty();
         }
-        if (!(definition instanceof MultiblockMachineDefinition) || definition.getId() == null) {
+        if (definition == null || definition.getId() == null) {
             return Optional.empty();
         }
         return Optional.of(definition.getId().toString());

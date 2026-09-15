@@ -3,9 +3,11 @@ package com.gtsn.ponder.datagen;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.gtsn.ponder.catalog.SingleBlockScenes;
 import com.gtsn.ponder.content.SystemSceneKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -45,7 +47,23 @@ class GeneratedLangKeysTest {
             SceneGenerator.NARRATION_MODULE_SLOT_NONE,
             SceneGenerator.NARRATION_MODULE_INSTALLED,
             SceneGenerator.NARRATION_MODULE_INSTALLED_NO_EFFECT,
-            SceneGenerator.NARRATION_FORMED);
+            SceneGenerator.NARRATION_FORMED,
+            // 单方块机器「使用场景」模板键（工单 #15）
+            SingleBlockUsageGenerator.NARRATION_INTRO,
+            SingleBlockUsageGenerator.NARRATION_MACHINE,
+            SingleBlockUsageGenerator.NARRATION_INPUTS,
+            SingleBlockUsageGenerator.NARRATION_INPUTS_NONE,
+            SingleBlockUsageGenerator.NARRATION_OUTPUTS,
+            SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
+            SingleBlockUsageGenerator.NARRATION_ENERGY,
+            SingleBlockUsageGenerator.NARRATION_PROGRESS,
+            SingleBlockUsageGenerator.NARRATION_COVERS,
+            SingleBlockUsageGenerator.NARRATION_PITFALLS,
+            // 手作单方块场景（精选）的旁白键
+            SingleBlockScenes.HAND_STEAM_FURNACE_INTRO,
+            SingleBlockScenes.HAND_STEAM_FURNACE_USAGE,
+            SingleBlockScenes.HAND_LV_MACERATOR_INTRO,
+            SingleBlockScenes.HAND_LV_MACERATOR_USAGE);
 
     private static final List<String> LEGEND_KEYS = List.of(
             GeneratedKeys.LEGEND_TITLE,

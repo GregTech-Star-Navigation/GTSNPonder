@@ -4,6 +4,7 @@ import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.Source;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -266,5 +267,59 @@ class SceneCatalogTest {
         SceneCatalog catalog = SceneCatalog.of(
                 List.of(scene("gtceu:coke_oven.scene", "gtceu:coke_oven", Source.HAND)), WatchedProgress.empty());
         assertEquals(1, catalog.total());
+    }
+
+    // --- 单方块机器使用场景（工单 #15）：合成使用场景条目 -----------------------------
+
+    @Test
+    void usageOverloadSynthesizesUsageEntriesForSingleBlockTargets() {
+        SceneCatalog catalog = SceneCatalog.of(List.of(), List.of("gtceu:coke_oven"),
+                List.of("gtceu:lp_steam_furnace"), WatchedProgress.empty());
+
+        assertEquals(2, catalog.total());
+        CatalogEntry usage = catalog.entries().stream()
+                .filter(entry -> entry.target().equals("gtceu:lp_steam_furnace"))
+                .findFirst().orElseThrow();
+        assertEquals(Source.AUTO, usage.source());
+        assertEquals(SingleBlockUsageGenerator.sceneIdFor("gtceu:lp_steam_furnace"), usage.key(),
+                "the usage entry key must equal the on-demand usage scene id");
+        assertEquals(SingleBlockUsageGenerator.titleKeyFor("gtceu:lp_steam_furnace"), usage.titleKey(),
+                "the usage entry title must reuse GT's own block name key");
+        assertEquals(SceneCategories.STEAM, usage.category());
+    }
+
+    @Test
+    void usageOverloadDeduplicatesAgainstLoadedScenesAndMultiblockTargets() {
+        List<SceneData> scenes = List.of(
+                scene(SingleBlockUsageGenerator.sceneIdFor("gtceu:lv_macerator"), "gtceu:lv_macerator", Source.HAND));
+
+        SceneCatalog catalog = SceneCatalog.of(scenes, List.of("gtceu:lv_macerator"),
+                List.of("gtceu:lv_macerator"), WatchedProgress.empty());
+
+        assertEquals(1, catalog.total(), "an already-covered target must not be synthesized twice");
+        assertEquals(Source.HAND, catalog.entries().get(0).source());
+    }
+
+    @Test
+    void usageSynthesizedEntryWatchedKeyMatchesTheUsageSceneId() {
+        WatchedProgress progress = WatchedProgress.empty()
+                .with(SingleBlockUsageGenerator.sceneIdFor("gtceu:lv_centrifuge"));
+
+        SceneCatalog catalog = SceneCatalog.of(List.of(), List.of(),
+                List.of("gtceu:lv_centrifuge"), progress);
+
+        assertEquals(1, catalog.total());
+        assertTrue(catalog.entries().get(0).watched());
+    }
+
+    @Test
+    void usageOverloadKeepsMultiblockSynthesisOnTheAutoKey() {
+        SceneCatalog catalog = SceneCatalog.of(List.of(), List.of("gtceu:steam_grinder"),
+                List.of("gtceu:lv_centrifuge"), WatchedProgress.empty());
+
+        CatalogEntry multiblock = catalog.entries().stream()
+                .filter(entry -> entry.target().equals("gtceu:steam_grinder")).findFirst().orElseThrow();
+        assertEquals(SceneGenerator.sceneIdFor("gtceu:steam_grinder"), multiblock.key());
+        assertEquals(GeneratedKeys.machineTitleKey("gtceu:steam_grinder"), multiblock.titleKey());
     }
 }

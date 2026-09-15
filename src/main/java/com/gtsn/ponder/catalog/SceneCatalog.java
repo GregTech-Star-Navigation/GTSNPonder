@@ -4,6 +4,7 @@ import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.Source;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -53,7 +54,28 @@ public final class SceneCatalog {
      */
     public static SceneCatalog of(List<SceneData> scenes, List<String> registeredTargets,
             WatchedProgress progress) {
+        return of(scenes, registeredTargets, List.of(), progress);
+    }
+
+    /**
+     * 由场景列表 + 已注册多方块目标 + <b>单方块机器目标</b> + 观看进度构建目录（工单 #15）。
+     *
+     * <p>{@code registeredTargets} 中的目标按多方块「按需自动生成」合成条目（键 =
+     * {@link SceneGenerator#sceneIdFor}）；{@code usageTargets} 中的目标按单方块「使用场景」合成条目
+     * （键 = {@link SingleBlockUsageGenerator#sceneIdFor}，标题键 = GT 方块名键）。两集合去重，且已被
+     * 已加载场景覆盖的目标不再合成。合成键与播放时按需产物的 {@code id} 一致，故已看标记能点亮。</p>
+     */
+    public static SceneCatalog of(List<SceneData> scenes, List<String> registeredTargets,
+            List<String> usageTargets, WatchedProgress progress) {
         WatchedProgress watched = progress == null ? WatchedProgress.empty() : progress;
+        Set<String> usageTargetSet = new HashSet<>();
+        if (usageTargets != null) {
+            for (String target : usageTargets) {
+                if (target != null && !target.isBlank()) {
+                    usageTargetSet.add(target);
+                }
+            }
+        }
         List<CatalogEntry> entries = new ArrayList<>();
         Set<String> coveredTargets = new HashSet<>();
         if (scenes != null) {
@@ -68,16 +90,24 @@ public final class SceneCatalog {
                         category, watched.isWatched(key)));
             }
         }
+        List<String> synthesisTargets = new ArrayList<>();
         if (registeredTargets != null) {
-            for (String target : registeredTargets) {
-                if (target == null || target.isBlank() || !coveredTargets.add(target)) {
-                    continue;
-                }
-                String key = SceneGenerator.sceneIdFor(target);
-                String category = SceneCategories.classify(target);
-                entries.add(new CatalogEntry(key, target, GeneratedKeys.machineTitleKey(target),
-                        Source.AUTO, category, watched.isWatched(key)));
+            synthesisTargets.addAll(registeredTargets);
+        }
+        if (usageTargets != null) {
+            synthesisTargets.addAll(usageTargets);
+        }
+        for (String target : synthesisTargets) {
+            if (target == null || target.isBlank() || !coveredTargets.add(target)) {
+                continue;
             }
+            boolean usage = usageTargetSet.contains(target);
+            String key = usage ? SingleBlockUsageGenerator.sceneIdFor(target)
+                    : SceneGenerator.sceneIdFor(target);
+            String titleKey = usage ? SingleBlockUsageGenerator.titleKeyFor(target)
+                    : GeneratedKeys.machineTitleKey(target);
+            String category = SceneCategories.classify(target);
+            entries.add(new CatalogEntry(key, target, titleKey, Source.AUTO, category, watched.isWatched(key)));
         }
         entries.sort(Comparator.comparingInt((CatalogEntry entry) -> SceneCategories.orderIndex(entry.category()))
                 .thenComparing(CatalogEntry::sortKey));

@@ -1,0 +1,60 @@
+{
+  "formatVersion": 1,
+  "id": "gtsnponder:usage_gtceu_lp_steam_furnace",
+  "title": "block.gtceu.lp_steam_furnace",
+  "target": "gtceu:lp_steam_furnace",
+  "variant": "default",
+  "source": "hand",
+  "generatorVersion": "hand-1",
+  "elements": [
+    {
+      "id": "machine",
+      "kind": "anchor",
+      "params": {
+        "selector": "all"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "focus.camera",
+      "type": "camera",
+      "duration": 0,
+      "targets": ["machine"],
+      "params": {
+        "yaw": 25.0,
+        "pitch": -135.0,
+        "distance": 2.5,
+        "fit": true,
+        "margin": 0.9
+      }
+    },
+    {
+      "id": "build.machine",
+      "type": "showSection",
+      "duration": 12,
+      "targets": ["machine"]
+    },
+    {
+      "id": "intro",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.usage.lp_steam_furnace.intro"
+    },
+    {
+      "id": "highlight.machine",
+      "type": "highlight",
+      "duration": 30,
+      "targets": ["machine"],
+      "params": {
+        "visible": true
+      }
+    },
+    {
+      "id": "text.usage",
+      "type": "text",
+      "duration": 60,
+      "narration": "ponder.gtsnponder.usage.lp_steam_furnace.usage"
+    }
+  ]
+}

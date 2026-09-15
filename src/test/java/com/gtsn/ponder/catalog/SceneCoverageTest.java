@@ -122,8 +122,9 @@ class SceneCoverageTest {
     }
 
     /**
-     * {@link SceneCoverage#CURATED} 必须与仓库里实际随包的手作 / 混合场景一一对应——防止「加了手作
-     * 场景文件却忘了登记精选清单」（或反之）造成的覆盖数字漂移。
+     * 精选清单（多方块 {@link SceneCoverage#CURATED} + 单方块 {@link SingleBlockScenes#CURATED}）必须与
+     * 仓库里实际随包的手作 / 混合场景一一对应——防止「加了手作场景文件却忘了登记精选清单」（或反之）
+     * 造成的覆盖数字漂移。
      */
     @Test
     void curatedListMatchesEveryBundledHandAuthoredScene() throws IOException {
@@ -136,7 +137,9 @@ class SceneCoverageTest {
                 }
             }
         }
-        assertEquals(new java.util.TreeSet<>(SceneCoverage.curatedTargets()), bundledTargets,
-                "the curated list must name exactly the bundled hand-authored scenes");
+        Set<String> curatedTargets = new java.util.TreeSet<>(SceneCoverage.curatedTargets());
+        curatedTargets.addAll(SingleBlockScenes.curatedTargets());
+        assertEquals(curatedTargets, bundledTargets,
+                "the curated lists must name exactly the bundled hand-authored scenes");
     }
 }

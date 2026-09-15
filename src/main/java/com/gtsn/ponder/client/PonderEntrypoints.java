@@ -1,5 +1,6 @@
 package com.gtsn.ponder.client;
 
+import com.gtsn.ponder.catalog.SingleBlockScenes;
 import com.gtsn.ponder.editor.EditorKeys;
 import com.gtsn.ponder.editor.EditorSession;
 import com.gtsn.ponder.editor.SceneDraft;
@@ -7,8 +8,11 @@ import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.SceneDataWriter;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import com.gtsn.ponder.gt.GtMultiblockCatalog;
+import com.gtsn.ponder.gt.GtSingleBlockAdapter;
 import com.gtsn.ponder.gt.GtStructureAdapter;
+import com.gtsn.ponder.structure.SingleBlockMachineSource;
 import com.gtsn.ponder.structure.StructureSource;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.logging.LogUtils;
@@ -75,6 +79,20 @@ public final class PonderEntrypoints {
         List<String> targets = new ArrayList<>();
         for (GtMultiblockCatalog.Multiblock machine : GtMultiblockCatalog.all()) {
             targets.add(machine.id());
+        }
+        return List.copyOf(targets);
+    }
+
+    /**
+     * 代表性单方块机器目标 id（工单 #15）：来自 {@link SingleBlockScenes#REPRESENTATIVE}，并过滤为
+     * 经适配器 {@link GtSingleBlockAdapter} 真正可解析者（保证目录条目零死链）。
+     */
+    public static List<String> representativeSingleBlockTargets() {
+        List<String> targets = new ArrayList<>();
+        for (String target : SingleBlockScenes.REPRESENTATIVE) {
+            if (GtSingleBlockAdapter.byId(target).isPresent()) {
+                targets.add(target);
+            }
         }
         return List.copyOf(targets);
     }
@@ -146,22 +164,43 @@ public final class PonderEntrypoints {
     }
 
     /**
-     * 手作优先 / 按需生成的统一解析（不打开界面）。目标须是可解析的 GT 多方块（手作场景亦需结构源
-     * 才能渲染）；否则为空（死链）。
+     * 手作优先 / 按需生成的统一解析（不打开界面）。目标须是可解析的 GT 多方块<b>或单方块机器</b>
+     * （手作场景亦需结构源才能渲染）；否则为空（死链）。
+     *
+     * <ul>
+     *   <li><b>多方块</b>：结构源经 {@link GtStructureAdapter}，无手作者用 {@link SceneGenerator}
+     *       （搭建演示）；</li>
+     *   <li><b>单方块机器</b>（工单 #15）：机器元数据经 {@link GtSingleBlockAdapter}，结构为 1×1×1 的
+     *       机器本体（{@link SingleBlockUsageGenerator#structureOf}），无手作者用
+     *       {@link SingleBlockUsageGenerator}（使用场景）。</li>
+     * </ul>
      */
     private static Optional<Resolved> resolve(String target, boolean forceGenerate) {
-        Optional<StructureSource> structure = GtStructureAdapter.byId(target);
-        if (structure.isEmpty()) {
-            return Optional.empty();
-        }
-        StructureSource source = structure.get();
-        if (!forceGenerate) {
-            SceneData authored = SceneLibrary.get().sceneForTarget(target).orElse(null);
-            if (authored != null) {
-                return Optional.of(new Resolved(authored, source));
+        Optional<StructureSource> multiblock = GtStructureAdapter.byId(target);
+        if (multiblock.isPresent()) {
+            StructureSource source = multiblock.get();
+            if (!forceGenerate) {
+                SceneData authored = SceneLibrary.get().sceneForTarget(target).orElse(null);
+                if (authored != null) {
+                    return Optional.of(new Resolved(authored, source));
+                }
             }
+            return Optional.of(new Resolved(SceneGenerator.generate(source), source));
         }
-        return Optional.of(new Resolved(SceneGenerator.generate(source), source));
+
+        Optional<SingleBlockMachineSource> singleBlock = GtSingleBlockAdapter.byId(target);
+        if (singleBlock.isPresent()) {
+            SingleBlockMachineSource machine = singleBlock.get();
+            StructureSource structure = SingleBlockUsageGenerator.structureOf(machine);
+            if (!forceGenerate) {
+                SceneData authored = SceneLibrary.get().sceneForTarget(target).orElse(null);
+                if (authored != null) {
+                    return Optional.of(new Resolved(authored, structure));
+                }
+            }
+            return Optional.of(new Resolved(SingleBlockUsageGenerator.generate(machine), structure));
+        }
+        return Optional.empty();
     }
 
     /**
@@ -172,7 +211,9 @@ public final class PonderEntrypoints {
         Minecraft minecraft = Minecraft.getInstance();
         List<SceneData> scenes = SceneLibrary.get().scenes();
         List<String> registeredTargets = registeredMultiblockTargets();
-        minecraft.execute(() -> minecraft.setScreen(new SceneCatalogScreen(scenes, registeredTargets)));
+        List<String> usageTargets = representativeSingleBlockTargets();
+        minecraft.execute(() -> minecraft.setScreen(
+                new SceneCatalogScreen(scenes, registeredTargets, usageTargets)));
         return true;
     }
 

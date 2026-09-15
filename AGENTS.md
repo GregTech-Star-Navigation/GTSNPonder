@@ -45,6 +45,7 @@ $env:GTSNPONDER_UI_AUTOTEST="gtgui"; .\gradlew.bat runClient  # GT 机器界面�
 $env:GTSNPONDER_UI_AUTOTEST="modules"; .\gradlew.bat runClient  # 模块系统演示自动测试（#14）：载入存档 → 以夹具结构源（两个模块位：具名带效果 / 任意模块）生成场景并播放 → 推进到效果汇总帧断言「模块位区域高亮（多单元）+ 安装生效（空槽被占用）+ 效果汇总旁白」→ 截图 run/screenshots/gtsnponder-modules.png → 重播断言 rewind 清除安装、再播断言确定性重现 → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="systems"; .\gradlew.bat runClient  # 发电·能量网 / 物流管网内容自动测试（#10）：载入存档 → 断言两类内容各 2 个真实 GT 目标经适配器解析且随包场景为 source=mixed → 打开目录断言「发电与能量 / 物流与管网」两类别各含期望目标 → 点击「相关机器」断言相关导航切到同类别兄弟、「全部」恢复 → 分别播放两类主场景断言步骤数与推进到「线缆熔断 / 覆盖板」概念旁白 → 截图 run/screenshots/gtsnponder-systems-{catalog,related,power,logistics}.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="coverage"; .\gradlew.bat runClient  # 全量覆盖自动测试（#13）：载入存档 → 枚举全部注册多方块（71 台）→ 断言「每台都有可播场景 + 精选关键机器（5 台）有手作讲解 + 零死链」→ 批量重生成全部生成场景到 run/gtsnponder-generated/ → 打开目录断言 71 条全覆盖 + 每条目可解析 → 播放一台按需生成场景断言 source=auto → 截图 run/screenshots/gtsnponder-coverage-{catalog,generated}.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="singleblock"; .\gradlew.bat runClient  # 单方块机器使用场景 + 入口自动测试（#15）：载入存档 → 断言代表性单方块机器（8 台）零死链 + 精选手作（2 台）齐全 + 目录合成使用场景条目 → 放置真实 gtceu:lp_steam_furnace 并以 GT 标准路径打开其 GUI → 断言覆盖按钮出现在真实单方块机器屏上且 target 正确（修复前 resolveTarget 对单方块返回空）→ 投递 MouseButtonPressed.Pre 断言点击打开手作使用场景（source=hand）并断言播放到期望手作旁白 → 断言生成目标 gtceu:lv_centrifuge 解析为 source=auto 使用场景并播放 → 截图 run/screenshots/gtsnponder-singleblock{,-scene,-generated}.png → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -196,6 +197,18 @@ MultiblockInfoCategory.RECIPE_TYPE, …)` 在 GT 多方块信息页叠加「思�
 - **覆盖分析（纯 Java，零 MC）**：`com.gtsn.ponder.catalog.SceneCoverage`——`CURATED`（5 台精选关键机器 + 其随包场景资源路径）与 `analyze(registeredTargets, resolve)` 折叠为数字（注册 / 可解析 / 手作 / 生成 / 精选手作讲解 / 死链）。headless 单测、GameTest、客户端自动测试共用该分析器，断言同一套数字。
 - **重生成缝（fork 升级后重生成并 diff）**：客户端命令 **`/gtsnponder dumpall`**（无参数）把全部注册多方块的自动生成场景批量写到 **`run/gtsnponder-generated/`**（稳定文件名 = 清洗后的目标 id + `.json`，共 71 个）。GT fork 升级后：`.\gradlew.bat --offline runClient` → `/gtsnponder dumpall` → `git diff --no-index`（或任意 diff 工具）比较旧 / 新目录即可看到结构变化。单机入口 `/gtsnponder dump <target>` 仍可用。
 - **证据**：headless `SceneCoverageTest`（分析器 + **读取真实随包场景文件**核对精选清单不漂移）、`SceneCatalogTest`（覆盖重载：合成 / 去重 / 已看键）= 单元测试（当前 **265** 项）；GameTest `CoverageGameTests.everyRegisteredMultiblockHasAPlayableScene`（枚举真实注册表：每台结构可解析 → 生成场景每个元素可解析 → 确定性；再经共享分析器核算数字）= **17** 项 GameTest；客户端自动测试 `GTSNPONDER_UI_AUTOTEST=coverage`（见上：数字 + 重生成 + 目录全可达 + 播放按需生成场景 + 截图）。
+
+### 单方块机器使用场景 + 入口（#15）
+
+- **缺口**：原 `GtMachineScreenAdapter.resolveTarget` 只对 `MultiblockMachineDefinition` 返回目标，故**单方块机器**（如 `gtceu:lp_steam_furnace`）在 GT 机器界面无「思索」覆盖按钮、也无场景（既有 71 台覆盖全是多方块）。
+- **入口（① 注视 / ② 命令 / ③ 目录 / ④ GT GUI）**：`resolveTarget` 改为对**任意** `MetaMachine`（多方块或单方块）返回其定义 id；`PonderEntrypoints.resolve` 先试多方块 `GtStructureAdapter`，否则试单方块 `GtSingleBlockAdapter`。非 GT 屏照旧 no-op。
+- **无可思索目标时的行为（本工单决定）**：覆盖按钮对任意 GT 机器屏**照常绘制**；点击后若目标解析不出场景，`openForTarget` 显示本地化空态提示（`ponder.gtsnponder.message.no_scene`）且**不消费**该次点击（即「绘制 + 点击时本地化空态提示」，而非静默不绘制）。见 `GtMachineScreenAdapter` javadoc。
+- **中立 DTO**：`com.gtsn.ponder.structure.SingleBlockMachineSource`（机器 id / 方块 / 等级 / 物品·流体输入输出计数 / 是否接电 / 配方类型 id 列表）——由唯一适配包 `GtSingleBlockAdapter` 从 `MachineDefinition` 元数据产出（**不需要多方块结构页**：等级取 `getTier()`+`GTValues.VN`，槽 / 罐 / 电能力由配方类型的 `maxInputs`/`maxOutputs` 按能力族聚合）。
+- **使用场景生成器（纯 Java）**：`com.gtsn.ponder.generate.SingleBlockUsageGenerator`——`SingleBlockMachineSource → SceneData`。机器本体表达为 **1×1×1** 的多方块结构源（`structureOf`：唯一方块 = 机器方块且为控制器单元），场景只声明一个元素 `machine`（选择器 `all`），**不新增元素选择器**（封闭词汇不变，见 `docs/scene-format.md`）。步骤用**既有封闭 `StepType`**：`intro` 文本 → 相机取景（`fit`）→ `showSection` 揭示本体 → `highlight` 本体 → 本体 / 输入 / 输出 / 能量 / 进度 / 覆盖板 / 常见坑旁白。**不含** `build.layer/role`、`installModule`、`formedPulse`（区别于多方块搭建演示）。旁白键 `ponder.gtsnponder.generated.usage.*`（带 `narrationArgs` 模板参数），场景 `title` 复用 GT 自身方块名键 `block.<ns>.<path>`（`titleKeyFor`），故任意单方块机器都有本地化标题、无需额外 datagen 枚举。产物 `source=auto` + `generatorVersion=usage-1`，确定性。
+- **代表性机器（8 台）**：蒸汽 `gtceu:lp_steam_furnace` / `lp_steam_macerator` / `lp_steam_alloy_smelter` / `lp_steam_solid_boiler`，基础电力 `gtceu:lv_macerator` / `lv_electric_furnace` / `lv_centrifuge` / `lv_electrolyzer`；其中 **2 台手作**（`lp_steam_furnace`、`lv_macerator`，`source=hand`，随包 JSON `assets/gtsnponder/ponder/{steam_furnace,lv_macerator}.json`），其余 6 台按需生成。清单 / 分析器为纯 Java `com.gtsn.ponder.catalog.SingleBlockScenes`（`REPRESENTATIVE` / `CURATED` / `analyze`），并加入随包手作场景守卫（`SceneCoverageTest.curatedListMatchesEveryBundledHandAuthoredScene` 现核验多方块 + 单方块两套精选清单之并集）。
+- **目录接线**：`SceneCatalog.of(scenes, registeredTargets, usageTargets, progress)` 为代表性单方块目标合成条目——键取 `SingleBlockUsageGenerator.sceneIdFor(target)`（`gtsnponder:usage_<sanitized>`，与按需产物 `id` 一致故已看标记可点亮），标题取 GT 方块名键；`SceneCatalogScreen` 新增 `usageTargets` 形参（旧签名保留）。类别由目标 id 关键词派生（蒸汽 → `steam`，电力 → `machines`）。
+- **文案**：`SingleBlockUsageGenerator` 的模板键与手作键经 `runData` 产出中英（**改动后必须重跑 `runData` 并提交产物**）；`GeneratedLangKeysTest` 守卫覆盖。
+- **证据**：headless 单测 `SingleBlockMachineSourceTest` / `SingleBlockUsageGeneratorTest`（使用场景形状 / 确定性 / 可播放 / 旁白键与参数）、`SingleBlockScenesTest`（代表性 / 手作文件 / 分析器）、`SceneCatalogTest`（使用条目合成 / 已看键）= **288** 项单元测试；GameTest `SingleBlockGameTests`（代表性 8 台真实注册表解析 + 生成确定性 + 元素可解析；精选手作随包文件 + 覆盖数字）= **19** 项 GameTest（含 #13 的 17 项）；客户端自动测试 `GTSNPONDER_UI_AUTOTEST=singleblock`（见上：真实单方块机器 GUI + 覆盖按钮 + 点击打开手作使用场景 + 生成使用场景 + 截图）。
 
 ### 依赖与类加载纪律
 
