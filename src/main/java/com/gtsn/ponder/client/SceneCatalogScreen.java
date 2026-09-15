@@ -9,6 +9,7 @@ import com.gtsn.lib.ui.layout.Sizing;
 import com.gtsn.lib.ui.screen.GtsnScreen;
 import com.gtsn.lib.ui.theme.ThemeColorRole;
 import com.gtsn.lib.ui.widget.ButtonWidget;
+import com.gtsn.lib.ui.widget.ClipWidget;
 import com.gtsn.lib.ui.widget.PanelWidget;
 import com.gtsn.lib.ui.widget.ScrollPanelWidget;
 import com.gtsn.lib.ui.widget.SpacerWidget;
@@ -47,9 +48,10 @@ public final class SceneCatalogScreen extends GtsnScreen {
     private static final int SIDE_WIDTH = 132;
     private static final int BUTTON_HEIGHT = 18;
     private static final int ROW_HEIGHT = 18;
-    private static final int MARK_WIDTH = 40;
-    private static final int PLAY_WIDTH = 52;
-    private static final int RELATED_WIDTH = 56;
+    /** 行内列宽 / 截断逻辑集中在纯 Java {@link CatalogRowLayout}（工单 #16 缺陷 B，可 headless 单测）。 */
+    private static final int MARK_WIDTH = CatalogRowLayout.MARK_WIDTH;
+    private static final int PLAY_WIDTH = CatalogRowLayout.PLAY_WIDTH;
+    private static final int RELATED_WIDTH = CatalogRowLayout.RELATED_WIDTH;
 
     private final List<SceneData> scenes;
     private final List<String> registeredTargets;
@@ -265,19 +267,37 @@ public final class SceneCatalogScreen extends GtsnScreen {
     }
 
     private ButtonWidget addEntryRow(Stack listContent, CatalogEntry entry) {
-        Stack row = listContent.add(new Stack(Direction.HORIZONTAL).fillWidth().gap(6)
+        Stack row = listContent.add(new Stack(Direction.HORIZONTAL).fillWidth().gap(CatalogRowLayout.GAP)
                 .crossAxisAlign(CrossAxisAlign.CENTER));
         row.add(new TextWidget(localized(entry.watched() ? CatalogKeys.WATCHED : CatalogKeys.UNWATCHED), metrics)
                 .colorRole(entry.watched() ? ThemeColorRole.TEXT_STRONG : ThemeColorRole.TEXT_MUTED)
                 .size(Sizing.fixed(MARK_WIDTH), Sizing.fixed(ROW_HEIGHT)));
-        row.add(new TextWidget(displayTitle(entry), metrics).colorRole(ThemeColorRole.TEXT)
+        // 名称（主）：填充剩余宽度 + ClipWidget 裁剪；文本按可用宽度截断并加省略号，绝不溢出到 id 列。
+        int nameBudget = CatalogRowLayout.nameWidth(rowWidth());
+        ClipWidget nameCell = row.add(new ClipWidget().size(Sizing.fill(), Sizing.fixed(ROW_HEIGHT)));
+        nameCell.add(new TextWidget(CatalogRowLayout.truncate(displayTitle(entry), nameBudget, metrics), metrics)
+                .colorRole(ThemeColorRole.TEXT)
                 .size(Sizing.fill(), Sizing.fixed(ROW_HEIGHT)));
-        row.add(new TextWidget(entry.target() == null ? "" : entry.target(), metrics)
-                .colorRole(ThemeColorRole.TEXT_MUTED));
+        // 原始 id（次）：固定宽度 + 裁剪 + 省略号（长 id 不再压到名称 / 按钮上）。
+        ClipWidget idCell = row.add(new ClipWidget().fixedSize(CatalogRowLayout.ID_WIDTH, ROW_HEIGHT));
+        idCell.add(new TextWidget(
+                CatalogRowLayout.truncate(entry.target() == null ? "" : entry.target(),
+                        CatalogRowLayout.ID_WIDTH - 4, metrics), metrics)
+                .colorRole(ThemeColorRole.TEXT_MUTED)
+                .size(Sizing.fill(), Sizing.fixed(ROW_HEIGHT)));
         visibleRelatedButtons.add(row.add(new ButtonWidget(localized(CatalogKeys.RELATED), metrics,
                 () -> showRelated(entry)).fixedSize(RELATED_WIDTH, BUTTON_HEIGHT)));
         return row.add(new ButtonWidget(localized(CatalogKeys.PLAY), metrics, () -> play(entry))
                 .fixedSize(PLAY_WIDTH, BUTTON_HEIGHT));
+    }
+
+    /**
+     * 条目行的可用像素宽度（工单 #16 缺陷 B）：屏幕宽扣除根内边距、左侧类别栏、列间距、列表内边距与
+     * 滚动条余量；{@code init()} 前（宽高未定）用一个保守默认值，{@code init()} 会用真实宽度重建。
+     */
+    private int rowWidth() {
+        int screenWidth = width > 0 ? width : 640;
+        return Math.max(240, screenWidth - 190);
     }
 
     private List<CatalogEntry> filterVisible() {
@@ -319,7 +339,8 @@ public final class SceneCatalogScreen extends GtsnScreen {
     @Override
     protected void init() {
         super.init();
-        host().resize(width, height);
+        // 屏幕尺寸已知后再重建一次：条目行按真实宽度计算名称列宽并截断长名 / 长 id（工单 #16 缺陷 B）。
+        rebuild();
         LOGGER.info("[GTSNPonder] scene catalog init: screen={}x{} scenes={} categories={} watched={}/{}",
                 width, height, catalog.total(), catalog.categories(), catalog.watchedCount(), catalog.total());
     }

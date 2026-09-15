@@ -18,10 +18,14 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.lwjgl.glfw.GLFW;
@@ -113,6 +117,73 @@ public final class PonderEntrypoints {
         BlockPos pos = blockHit.getBlockPos();
         String blockId = BuiltInRegistries.BLOCK.getKey(minecraft.level.getBlockState(pos).getBlock()).toString();
         return openForTarget(blockId);
+    }
+
+    /**
+     * 思索快捷键的统一入口（工单 #16 缺陷 C）：无界面时按「注视方块」进入，有界面时按「鼠标悬停的
+     * 物品」进入（背包 / JEI / EMI）。由 {@code PonderClientEvents} 每 tick 消费快捷键点击后调用。
+     */
+    public static boolean onPonderKeyPressed() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen == null) {
+            return openForLookedAtTarget();
+        }
+        if (!isHoverEntryScreen(minecraft.screen)) {
+            return false;
+        }
+        return openForHoveredItem();
+    }
+
+    /** 当前屏是否为「物品悬停入口」屏（原版容器屏，或 JEI/EMI 正悬停某物品的任意屏）。 */
+    public static boolean isHoverEntryScreen(Screen screen) {
+        if (screen == null) {
+            return false;
+        }
+        if (screen instanceof AbstractContainerScreen<?>) {
+            return true;
+        }
+        return PonderXeiItemHover.get().hoveredItemId().isPresent();
+    }
+
+    /**
+     * 鼠标悬停物品入口：解析当前光标下的物品注册 id（优先 JEI/EMI 悬停物品，其次原版容器槽），
+     * 再按目标 id 打开思索屏。无可解析目标时显示本地化空态提示。
+     */
+    public static boolean openForHoveredItem() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            message("ponder.gtsnponder.message.no_world");
+            return false;
+        }
+        Optional<String> itemId = hoveredItemId();
+        if (itemId.isEmpty()) {
+            message("ponder.gtsnponder.message.no_item");
+            return false;
+        }
+        return openForTarget(itemId.get());
+    }
+
+    /**
+     * 当前光标下物品的注册 id：<b>先</b>查 XEI（JEI/EMI）登记缝——命中物品列表 / 配方槽；<b>再</b>查
+     * 原版容器槽（{@link AbstractContainerScreen#getSlotUnderMouse()}，背包 / 箱子 / 创造栏）。
+     * 无悬停物品时空。
+     */
+    public static Optional<String> hoveredItemId() {
+        Optional<String> xei = PonderXeiItemHover.get().hoveredItemId();
+        if (xei.isPresent()) {
+            return xei;
+        }
+        Screen screen = Minecraft.getInstance().screen;
+        if (screen instanceof AbstractContainerScreen<?> container) {
+            Slot slot = container.getSlotUnderMouse();
+            if (slot != null && slot.hasItem()) {
+                ItemStack stack = slot.getItem();
+                if (!stack.isEmpty()) {
+                    return Optional.of(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     /**

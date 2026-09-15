@@ -16,6 +16,12 @@ public final class GeneratedKeys {
     /** 机器标题键前缀；完整键 = 前缀 + <b>清洗后的 target id</b> + {@code .title}。 */
     public static final String MACHINE_TITLE_PREFIX = "ponder.gtsnponder.generated.machine.";
 
+    /**
+     * 仓口 / 总线角色语言键前缀（工单 #16 缺陷 A2）：完整键 = 前缀 + <b>大写的枚举名</b>，
+     * 例如 {@code ponder.gtsnponder.generated.role.ENERGY_INPUT}。
+     */
+    public static final String ROLE_PREFIX = "ponder.gtsnponder.generated.role.";
+
     /** 常驻颜色图例的本地化键。 */
     public static final String LEGEND_TITLE = "ponder.gtsnponder.legend.title";
     public static final String LEGEND_CONTROLLER = "ponder.gtsnponder.legend.controller";
@@ -31,6 +37,14 @@ public final class GeneratedKeys {
      */
     public static String machineTitleKey(String targetId) {
         return MACHINE_TITLE_PREFIX + sanitize(targetId) + ".title";
+    }
+
+    /**
+     * 仓口 / 总线角色的本地化键：完整键 = {@link #ROLE_PREFIX} + 大写的枚举名，
+     * 如 {@code roleKey("ENERGY_INPUT")} → {@code ponder.gtsnponder.generated.role.ENERGY_INPUT}。
+     */
+    public static String roleKey(String roleName) {
+        return ROLE_PREFIX + roleName;
     }
 
     /** 结构 id → 稳定键片段：小写，非 {@code [a-z0-9_]} 的字符替换为 {@code _}。 */

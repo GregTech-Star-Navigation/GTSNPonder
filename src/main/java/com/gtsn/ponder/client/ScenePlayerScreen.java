@@ -17,6 +17,7 @@ import com.gtsn.lib.ui.widget.TextMetrics;
 import com.gtsn.lib.ui.widget.TextWidget;
 import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.generate.GeneratedKeys;
+import com.gtsn.ponder.presenter.NarrationLocalization;
 import com.gtsn.ponder.presenter.ScenePlayback;
 import com.gtsn.ponder.structure.StructureSource;
 import com.gtsn.ponder.viewport.ViewportWidget;
@@ -24,7 +25,9 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 
@@ -162,7 +165,27 @@ public final class ScenePlayerScreen extends GtsnScreen {
         if (args == null || args.isEmpty()) {
             return Component.translatable(key).getString();
         }
-        return Component.translatable(key, args.toArray()).getString();
+        java.util.List<java.util.List<NarrationLocalization.Part>> resolved =
+                NarrationLocalization.resolveArgs(args, Language.getInstance()::has);
+        Object[] substituents = new Object[resolved.size()];
+        for (int index = 0; index < resolved.size(); index++) {
+            substituents[index] = componentOf(resolved.get(index));
+        }
+        return Component.translatable(key, substituents).getString();
+    }
+
+    /**
+     * 把解析后的旁白参数片段拼成一个组件（工单 #16 缺陷 A1/A2）：可翻译片段按当前语言的机器标题 /
+     * 角色名渲染，字面量片段原样渲染，从而旁白不再露出原始注册 id 与枚举名。
+     */
+    private static Component componentOf(java.util.List<NarrationLocalization.Part> parts) {
+        MutableComponent component = Component.empty();
+        for (NarrationLocalization.Part part : parts) {
+            component.append(part.translatable()
+                    ? Component.translatable(part.value())
+                    : Component.literal(part.value()));
+        }
+        return component;
     }
 
     /** 姣忓鎴风 tick 鎺ㄨ繘瀵兼紨骞跺埛鏂版帶浠剁粦瀹氾紙鐢?{@code PonderClientEvents} 璋冪敤锛夈€?*/

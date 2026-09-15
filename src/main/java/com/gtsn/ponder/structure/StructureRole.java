@@ -56,4 +56,22 @@ public enum StructureRole {
     public boolean isController() {
         return this == CONTROLLER;
     }
+
+    /**
+     * 按枚举名解析角色（大小写敏感，与 {@link #name()} 一致）；未知 / {@code null} 返回空。
+     *
+     * <p>供旁白参数本地化在渲染期把角色枚举名还原为角色（{@code com.gtsn.ponder.presenter.
+     * NarrationLocalization}）：枚举名不会抛异常地解析，未知名字原样保留。</p>
+     */
+    public static java.util.Optional<StructureRole> fromName(String name) {
+        if (name == null) {
+            return java.util.Optional.empty();
+        }
+        for (StructureRole role : values()) {
+            if (role.name().equals(name)) {
+                return java.util.Optional.of(role);
+            }
+        }
+        return java.util.Optional.empty();
+    }
 }

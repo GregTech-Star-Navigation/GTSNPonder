@@ -9,6 +9,7 @@ import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import com.gtsn.ponder.gt.GtMultiblockCatalog;
+import com.gtsn.ponder.structure.StructureRole;
 
 import net.minecraft.data.PackOutput;
 import net.minecraftforge.common.data.LanguageProvider;
@@ -98,6 +99,8 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(GeneratedKeys.LEGEND_MODULE_SLOT, "Module slot (green)");
 
         keys.put("ponder.gtsnponder.message.no_target", "No GT machine or multiblock in view (within reach).");
+        keys.put("ponder.gtsnponder.message.no_item",
+                "No ponderable item under the cursor (hover a GT machine item in your inventory / JEI / EMI).");
         keys.put("ponder.gtsnponder.message.no_scene", "No ponder scene is registered for %s.");
         keys.put("ponder.gtsnponder.message.no_world", "Join a world before opening ponder.");
         keys.put("ponder.gtsnponder.message.dump", "Generated scene written to %s");
@@ -106,6 +109,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         catalogKeys(keys, false);
         systemSceneKeys(keys, false);
         usageSceneKeys(keys, false);
+        roleKeys(keys, false);
         return keys;
     }
 
@@ -131,7 +135,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(SceneGenerator.NARRATION_INTRO, "这是 %s，一台 %s 的多方块。看看方块如何拼合。");
         keys.put(SceneGenerator.NARRATION_CONTROLLER, "控制器位于 %s，通电后多方块即成型。");
         keys.put(SceneGenerator.NARRATION_CONTROLLER_NONE, "该结构页未声明控制器方块。");
-        keys.put(SceneGenerator.NARRATION_HATCHES, "%s 个仓口 / 总线（%s）。");
+        keys.put(SceneGenerator.NARRATION_HATCHES, "%s 个仓口 / 总线 (%s)。");
         keys.put(SceneGenerator.NARRATION_HATCHES_NONE, "该结构未声明仓口或总线。");
         keys.put(SceneGenerator.NARRATION_MODULES, "%s 个模块位——在此安装匹配的模块。");
         keys.put(SceneGenerator.NARRATION_MODULES_NONE, "该结构未声明模块位。");
@@ -142,7 +146,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
                 "安装 %s 到槽 %s——并行 %s、速度 ×%s、能耗 ×%s、输入 ×%s、输出 ×%s、等级 +%s。");
         keys.put(SceneGenerator.NARRATION_MODULE_INSTALLED_NO_EFFECT, "安装 %s 到槽 %s——无配方效果。");
         keys.put(SceneGenerator.NARRATION_FORMED,
-                "%s（%s）成型演示：本机 %s 个仓口 / 总线（%s）、%s 个模块位。先隐藏再重现，即未成型 → 成型。");
+                "%s(%s)成型演示：本机 %s 个仓口 / 总线 (%s)、%s 个模块位。先隐藏再重现，即未成型 → 成型。");
 
         keys.put(GeneratedKeys.LEGEND_TITLE, "图例");
         keys.put(GeneratedKeys.LEGEND_CONTROLLER, "控制器（金色）");
@@ -150,6 +154,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(GeneratedKeys.LEGEND_MODULE_SLOT, "模块位（绿色）");
 
         keys.put("ponder.gtsnponder.message.no_target", "视线内没有格雷科技机器 / 多方块（需在触及范围内）。");
+        keys.put("ponder.gtsnponder.message.no_item", "鼠标下没有可思索的物品（把光标移到背包 / JEI / EMI 中的格雷科技机器物品上）。");
         keys.put("ponder.gtsnponder.message.no_scene", "%s 暂无思索场景。");
         keys.put("ponder.gtsnponder.message.no_world", "请先进入世界再打开思索。");
         keys.put("ponder.gtsnponder.message.dump", "已把生成场景写入 %s");
@@ -158,6 +163,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         catalogKeys(keys, true);
         systemSceneKeys(keys, true);
         usageSceneKeys(keys, true);
+        roleKeys(keys, true);
         return keys;
     }
 
@@ -230,7 +236,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
             keys.put(SystemSceneKeys.POWER_CONTROLLER,
                     "控制器位于正面中央：通入正确电压后多方块成型。");
             keys.put(SystemSceneKeys.POWER_VOLTAGE,
-                    "格雷科技的电按电压等级划分（ULV、LV、MV、HV……）。机器只接受自己那一级，变压器负责在等级之间转换。");
+                    "格雷科技的电按电压等级划分(ULV、LV、MV、HV……)。机器只接受自己那一级，变压器负责在等级之间转换。");
             keys.put(SystemSceneKeys.POWER_OVERVOLTAGE,
                     "超压：给机器通入高于它支持的电压，能耗变为 4 倍，并可能损坏甚至炸毁机器。");
             keys.put(SystemSceneKeys.POWER_BURNING,
@@ -250,7 +256,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
             keys.put(SystemSceneKeys.LOGISTICS_CABLES,
                     "线缆在发电机、变压器与机器之间输送 EU——按电压与安培数选用合适的线缆。");
             keys.put(SystemSceneKeys.LOGISTICS_COVERS,
-                    "覆盖板可装在机器与管道上：传送带（物品）、泵（流体）、机器控制器（自动进出）等。");
+                    "覆盖板可装在机器与管道上：传送带(物品)、泵(流体)、机器控制器(自动进出)等。");
             return;
         }
         keys.put(SystemSceneKeys.POWER_COMBUSTION_TITLE, "Power grid: Large Combustion Engine");
@@ -300,23 +306,23 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
     private static void usageSceneKeys(Map<String, String> keys, boolean chinese) {
         if (chinese) {
             keys.put(SingleBlockUsageGenerator.NARRATION_INTRO,
-                    "这是 %s（%s 级机器），配方类型：%s。下面讲解如何使用它。");
+                    "这是 %s(%s 级机器)，配方类型：%s。下面讲解如何使用它。");
             keys.put(SingleBlockUsageGenerator.NARRATION_MACHINE,
                     "%s 本身就是整台机器——所有部件都在这一个方块里。");
             keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS,
                     "输入：%s 个物品槽、%s 个流体罐。把配方原料放进来。");
             keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS_NONE,
-                    "这台机器没有物品 / 流体输入（%s 个物品槽、%s 个流体罐），它只对自身工作。");
+                    "这台机器没有物品 / 流体输入(%s 个物品槽、%s 个流体罐)，它只对自身工作。");
             keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS,
                     "输出：%s 个物品槽、%s 个流体罐。从这里取出产物。");
             keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
-                    "这台机器没有物品 / 流体输出（%s 个物品槽、%s 个流体罐）。");
+                    "这台机器没有物品 / 流体输出(%s 个物品槽、%s 个流体罐)。");
             keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY,
                     "能量：它使用 %s 级电压。接上匹配的线缆或发电机即可供电。");
             keys.put(SingleBlockUsageGenerator.NARRATION_PROGRESS,
                     "配方运行时进度条会填充；若停滞，说明在等待原料或电力。");
             keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
-                    "覆盖板可装在机器侧面：传送带（物品）、泵（流体）、机器控制器（自动进出）等。");
+                    "覆盖板可装在机器侧面：传送带(物品)、泵(流体)、机器控制器(自动进出)等。");
             keys.put(SingleBlockUsageGenerator.NARRATION_PITFALLS,
                     "常见坑：通入 %s 或更高电压会损坏机器；产物槽满则处理停止。");
             keys.put(SingleBlockScenes.HAND_STEAM_FURNACE_INTRO,
@@ -360,6 +366,52 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
                 "This is the Basic Macerator - the LV workhorse that grinds ores into dusts.");
         keys.put(SingleBlockScenes.HAND_LV_MACERATOR_USAGE,
                 "Put ore in the input slot, give it LV power, and pull the dust from the output slot.");
+    }
+
+    /**
+     * 仓口 / 总线角色的本地化名（工单 #16 缺陷 A2）：自动生成旁白原本直接渲染 {@code StructureRole}
+     * 的枚举名（{@code ENERGY_INPUT} / {@code MAINTENANCE} / {@code OTHER_HATCH}），本方法为每个角色
+     * 产出中英键（{@link GeneratedKeys#roleKey(String)}），播放屏经 {@code NarrationLocalization} 解析。
+     */
+    private static void roleKeys(Map<String, String> keys, boolean chinese) {
+        for (StructureRole role : StructureRole.values()) {
+            String key = GeneratedKeys.roleKey(role.name());
+            keys.put(key, chinese ? roleNameZh(role) : roleNameEn(role));
+        }
+    }
+
+    private static String roleNameZh(StructureRole role) {
+        return switch (role) {
+            case PLAIN -> "普通方块";
+            case CONTROLLER -> "控制器";
+            case ITEM_INPUT -> "物品输入总线";
+            case ITEM_OUTPUT -> "物品输出总线";
+            case FLUID_INPUT -> "流体输入仓";
+            case FLUID_OUTPUT -> "流体输出仓";
+            case ENERGY_INPUT -> "能量输入仓";
+            case ENERGY_OUTPUT -> "能量输出仓";
+            case MUFFLER -> "消声仓";
+            case MAINTENANCE -> "维护仓";
+            case PASSTHROUGH -> "直通仓";
+            case OTHER_HATCH -> "其它仓口";
+        };
+    }
+
+    private static String roleNameEn(StructureRole role) {
+        return switch (role) {
+            case PLAIN -> "Plain block";
+            case CONTROLLER -> "Controller";
+            case ITEM_INPUT -> "Item input bus";
+            case ITEM_OUTPUT -> "Item output bus";
+            case FLUID_INPUT -> "Fluid input hatch";
+            case FLUID_OUTPUT -> "Fluid output hatch";
+            case ENERGY_INPUT -> "Energy input hatch";
+            case ENERGY_OUTPUT -> "Energy output hatch";
+            case MUFFLER -> "Muffler hatch";
+            case MAINTENANCE -> "Maintenance hatch";
+            case PASSTHROUGH -> "Passthrough hatch";
+            case OTHER_HATCH -> "Other hatch";
+        };
     }
 
     /**

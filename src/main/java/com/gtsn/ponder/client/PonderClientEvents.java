@@ -86,8 +86,9 @@ public final class PonderClientEvents {
         while (PonderEntrypoints.PONDER_KEY.consumeClick()) {
             presses++;
         }
-        if (presses > 0 && minecraft.screen == null) {
-            PonderEntrypoints.openForLookedAtTarget();
+        if (presses > 0) {
+            // 无界面 → 注视方块；有界面 → 鼠标悬停物品（背包 / JEI / EMI）（工单 #16 缺陷 C）。
+            PonderEntrypoints.onPonderKeyPressed();
         }
         int catalogPresses = 0;
         while (PonderEntrypoints.CATALOG_KEY.consumeClick()) {

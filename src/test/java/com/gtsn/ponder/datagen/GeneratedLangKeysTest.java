@@ -116,6 +116,23 @@ class GeneratedLangKeysTest {
     }
 
     /**
+     * 工单 #16 缺陷 A2：每个 {@code StructureRole} 都必须有中英角色名键，否则自动旁白会露出原始枚举名
+     * （{@code ENERGY_INPUT} / {@code MAINTENANCE} / {@code OTHER_HATCH}）。
+     */
+    @Test
+    void bothLocalesCoverEveryStructureRoleName() throws IOException {
+        JsonObject en = read(EN, "en_us");
+        JsonObject zh = read(ZH, "zh_cn");
+        for (com.gtsn.ponder.structure.StructureRole role : com.gtsn.ponder.structure.StructureRole.values()) {
+            String key = GeneratedKeys.roleKey(role.name());
+            assertTrue(en.has(key), "en_us is missing role key " + key);
+            assertTrue(zh.has(key), "zh_cn is missing role key " + key);
+            assertFalse(en.get(key).getAsString().isBlank(), key);
+            assertFalse(zh.get(key).getAsString().isBlank(), key);
+        }
+    }
+
+    /**
      * 内容工单 #10 的随包系统场景（发电 / 物流）标题 / 开场 / 概念文案，以及目录「相关机器」导航键，
      * 必须经 datagen 产出中英双语且非空白——防止「加了场景却忘了重跑 runData」。
      */
@@ -130,6 +147,27 @@ class GeneratedLangKeysTest {
                 assertTrue(locale.getValue().has(key), locale.getKey() + " is missing system scene key " + key);
                 assertFalse(locale.getValue().get(key).getAsString().isBlank(), key);
             }
+        }
+    }
+
+    /**
+     * 工单 #16 缺陷 A3 回归守卫：zh_cn 的旁白模板不得再使用<b>全角括号</b>（U+FF08 / U+FF09）。
+     *
+     * <p>GTSNLib 的 Sarasa 子集字体为全角括号时，字形墨迹贴住 em 内缘，在 UI 字号下与相邻字符
+     * 视觉粘连（实测 {@code （3x3x3）} 读作 {@code $x3x3)}，见 {@code docs/acceptance/font-build-test.txt}）。
+     * 故旁白统一改用半角括号；本测试锁定该约定，防止回退。</p>
+     */
+    @Test
+    void zhNarrationTemplatesAvoidFontBrokenFullwidthParens() throws IOException {
+        JsonObject zh = read(ZH, "zh_cn");
+        List<String> keys = new ArrayList<>(NARRATION_KEYS);
+        keys.addAll(SystemSceneKeys.ALL);
+        for (String key : keys) {
+            String value = zh.get(key).getAsString();
+            assertFalse(value.indexOf('\uFF08') >= 0,
+                    "zh narration " + key + " must not use fullwidth '(' (font-broken glyph): " + value);
+            assertFalse(value.indexOf('\uFF09') >= 0,
+                    "zh narration " + key + " must not use fullwidth ')' (font-broken glyph): " + value);
         }
     }
 
