@@ -48,10 +48,23 @@ public final class SceneCatalogScreen extends GtsnScreen {
     private static final int SIDE_WIDTH = 132;
     private static final int BUTTON_HEIGHT = 18;
     private static final int ROW_HEIGHT = 18;
-    /** 行内列宽 / 截断逻辑集中在纯 Java {@link CatalogRowLayout}（工单 #16 缺陷 B，可 headless 单测）。 */
-    private static final int MARK_WIDTH = CatalogRowLayout.MARK_WIDTH;
-    private static final int PLAY_WIDTH = CatalogRowLayout.PLAY_WIDTH;
-    private static final int RELATED_WIDTH = CatalogRowLayout.RELATED_WIDTH;
+    /** 根内边距（四周）。 */
+    private static final int ROOT_PADDING = 8;
+    /** 侧栏（类别）与列表之间的列间距。 */
+    private static final int MAIN_GAP = 6;
+    /** 滚动条槽宽：两个 {@code ScrollPanelWidget} 都显式设置，使行宽推导与真实视口一致。 */
+    private static final int SCROLLBAR_WIDTH = 6;
+    /** 列表内容内边距（四周）。 */
+    private static final int LIST_PADDING = 2;
+    /**
+     * 条目行的「屏幕扣除量」（工单 #19）：根内边距 2×8 + 侧栏 132 + 主列间距 6 + 列表滚动条 6 +
+     * 列表内边距 2×2 = 164。行可用宽 = 屏幕宽 − 此值，与 {@link #buildRoot()} 的实际布局一一对应
+     * （各窗口 / GUI 缩放下的行内边界由 catalog 自动测试断言自证）。
+     */
+    private static final int ROW_CHROME_WIDTH = 2 * ROOT_PADDING + SIDE_WIDTH + MAIN_GAP
+            + SCROLLBAR_WIDTH + 2 * LIST_PADDING;
+    /** 屏幕宽未知（{@code init()} 前）时的保守回退值。 */
+    private static final int FALLBACK_SCREEN_WIDTH = 640;
 
     private final List<SceneData> scenes;
     private final List<String> registeredTargets;
@@ -69,6 +82,7 @@ public final class SceneCatalogScreen extends GtsnScreen {
     private final List<String> categoryOrder = new ArrayList<>();
     private final List<ButtonWidget> visiblePlayButtons = new ArrayList<>();
     private final List<ButtonWidget> visibleRelatedButtons = new ArrayList<>();
+    private final List<Stack> visibleRows = new ArrayList<>();
     private List<CatalogEntry> visibleEntries = List.of();
     private TextWidget progressLabel;
     private TextWidget emptyLabel;
@@ -120,6 +134,11 @@ public final class SceneCatalogScreen extends GtsnScreen {
     /** 与 {@link #visibleEntries()} 对齐的「相关机器」按钮（自动测试可点击）。 */
     public List<ButtonWidget> visibleRelatedButtons() {
         return List.copyOf(visibleRelatedButtons);
+    }
+
+    /** 与 {@link #visibleEntries()} 对齐的条目行（自动测试断言行内各列 / 按钮的边界）。 */
+    public List<Stack> visibleRows() {
+        return List.copyOf(visibleRows);
     }
 
     /** 当前「相关机器」导航锚点；{@code null} = 未进入相关视图。 */
@@ -207,7 +226,7 @@ public final class SceneCatalogScreen extends GtsnScreen {
 
     private PanelWidget buildRoot() {
         PanelWidget root = new PanelWidget().fill();
-        root.node().params().padding(Insets.all(8)).gap(6);
+        root.node().params().padding(Insets.all(ROOT_PADDING)).gap(6);
         root.align(MainAxisAlign.START, CrossAxisAlign.STRETCH);
 
         Stack header = root.add(hstack());
@@ -229,10 +248,11 @@ public final class SceneCatalogScreen extends GtsnScreen {
         searchField = searchRow.add(new EditorTextField(query, metrics, 64, this::onQueryChanged).fillWidth());
         searchField.node().params().height(Sizing.fixed(BUTTON_HEIGHT));
 
-        Stack main = root.add(new Stack(Direction.HORIZONTAL).fillWidth().weight(1).gap(6)
+        Stack main = root.add(new Stack(Direction.HORIZONTAL).fillWidth().weight(1).gap(MAIN_GAP)
                 .crossAxisAlign(CrossAxisAlign.STRETCH));
 
-        ScrollPanelWidget side = main.add(new ScrollPanelWidget().size(Sizing.fixed(SIDE_WIDTH), Sizing.fill()));
+        ScrollPanelWidget side = main.add(new ScrollPanelWidget()
+                .scrollbarWidth(SCROLLBAR_WIDTH).size(Sizing.fixed(SIDE_WIDTH), Sizing.fill()));
         Stack sideContent = side.add(new Stack(Direction.VERTICAL).fillWidth().gap(3).padding(Insets.all(3)));
         allCategoryButton = sideContent.add(new ButtonWidget(localized(CatalogKeys.ALL), metrics,
                 () -> selectCategory(null)).fixedSize(SIDE_WIDTH - 12, BUTTON_HEIGHT));
@@ -244,11 +264,14 @@ public final class SceneCatalogScreen extends GtsnScreen {
                     () -> selectCategory(category)).fixedSize(SIDE_WIDTH - 12, BUTTON_HEIGHT)));
         }
 
-        ScrollPanelWidget list = main.add(new ScrollPanelWidget().size(Sizing.fill(), Sizing.fill()).weight(1));
-        Stack listContent = list.add(new Stack(Direction.VERTICAL).fillWidth().gap(2).padding(Insets.all(2)));
+        ScrollPanelWidget list = main.add(new ScrollPanelWidget()
+                .scrollbarWidth(SCROLLBAR_WIDTH).size(Sizing.fill(), Sizing.fill()).weight(1));
+        Stack listContent = list.add(new Stack(Direction.VERTICAL).fillWidth().gap(2)
+                .padding(Insets.all(LIST_PADDING)));
         visibleEntries = filterVisible();
         visiblePlayButtons.clear();
         visibleRelatedButtons.clear();
+        visibleRows.clear();
         if (visibleEntries.isEmpty()) {
             emptyLabel = listContent.add(new TextWidget(localized(CatalogKeys.EMPTY), metrics)
                     .colorRole(ThemeColorRole.TEXT_MUTED));
@@ -267,37 +290,42 @@ public final class SceneCatalogScreen extends GtsnScreen {
     }
 
     private ButtonWidget addEntryRow(Stack listContent, CatalogEntry entry) {
+        // 响应式列宽（工单 #19）：行可用宽 − 固定列后按 id → 相关 → 播放 → 名称 收缩，保证整行放得下。
+        CatalogRowLayout.Columns columns = CatalogRowLayout.columnsFor(availableRowWidth());
         Stack row = listContent.add(new Stack(Direction.HORIZONTAL).fillWidth().gap(CatalogRowLayout.GAP)
                 .crossAxisAlign(CrossAxisAlign.CENTER));
+        visibleRows.add(row);
         row.add(new TextWidget(localized(entry.watched() ? CatalogKeys.WATCHED : CatalogKeys.UNWATCHED), metrics)
                 .colorRole(entry.watched() ? ThemeColorRole.TEXT_STRONG : ThemeColorRole.TEXT_MUTED)
-                .size(Sizing.fixed(MARK_WIDTH), Sizing.fixed(ROW_HEIGHT)));
-        // 名称（主）：填充剩余宽度 + ClipWidget 裁剪；文本按可用宽度截断并加省略号，绝不溢出到 id 列。
-        int nameBudget = CatalogRowLayout.nameWidth(rowWidth());
-        ClipWidget nameCell = row.add(new ClipWidget().size(Sizing.fill(), Sizing.fixed(ROW_HEIGHT)));
-        nameCell.add(new TextWidget(CatalogRowLayout.truncate(displayTitle(entry), nameBudget, metrics), metrics)
+                .size(Sizing.fixed(columns.mark()), Sizing.fixed(ROW_HEIGHT)));
+        // 名称（主）：显式列宽（不能再是 Sizing.fill——余量 ≤ 0 时 fill 会把名称撑满整行、把右侧列挤出
+        // 视口，工单 #19）；文本按列宽截断 + ClipWidget 裁剪，绝不溢出到 id 列。
+        ClipWidget nameCell = row.add(new ClipWidget().fixedSize(columns.name(), ROW_HEIGHT));
+        nameCell.add(new TextWidget(CatalogRowLayout.truncate(displayTitle(entry), columns.name() - 4, metrics),
+                metrics)
                 .colorRole(ThemeColorRole.TEXT)
                 .size(Sizing.fill(), Sizing.fixed(ROW_HEIGHT)));
-        // 原始 id（次）：固定宽度 + 裁剪 + 省略号（长 id 不再压到名称 / 按钮上）。
-        ClipWidget idCell = row.add(new ClipWidget().fixedSize(CatalogRowLayout.ID_WIDTH, ROW_HEIGHT));
+        // 原始 id（次）：显式列宽（窄屏第一个收缩）+ 裁剪 + 省略号（长 id 不再压到名称 / 按钮上）。
+        ClipWidget idCell = row.add(new ClipWidget().fixedSize(columns.id(), ROW_HEIGHT));
         idCell.add(new TextWidget(
                 CatalogRowLayout.truncate(entry.target() == null ? "" : entry.target(),
-                        CatalogRowLayout.ID_WIDTH - 4, metrics), metrics)
+                        columns.id() - 4, metrics), metrics)
                 .colorRole(ThemeColorRole.TEXT_MUTED)
                 .size(Sizing.fill(), Sizing.fixed(ROW_HEIGHT)));
         visibleRelatedButtons.add(row.add(new ButtonWidget(localized(CatalogKeys.RELATED), metrics,
-                () -> showRelated(entry)).fixedSize(RELATED_WIDTH, BUTTON_HEIGHT)));
+                () -> showRelated(entry)).fixedSize(columns.related(), BUTTON_HEIGHT)));
         return row.add(new ButtonWidget(localized(CatalogKeys.PLAY), metrics, () -> play(entry))
-                .fixedSize(PLAY_WIDTH, BUTTON_HEIGHT));
+                .fixedSize(columns.play(), BUTTON_HEIGHT));
     }
 
     /**
-     * 条目行的可用像素宽度（工单 #16 缺陷 B）：屏幕宽扣除根内边距、左侧类别栏、列间距、列表内边距与
-     * 滚动条余量；{@code init()} 前（宽高未定）用一个保守默认值，{@code init()} 会用真实宽度重建。
+     * 条目行的可用像素宽度（工单 #16 缺陷 B / #19）：屏幕宽扣除 {@link #ROW_CHROME_WIDTH}（根内边距、
+     * 左侧类别栏、列间距、列表滚动条与列表内边距的具名常量之和），故与真实容器宽度一致；{@code init()}
+     * 前（宽高未定）用一个保守默认值，{@code init()} 会用真实宽度重建。
      */
-    private int rowWidth() {
-        int screenWidth = width > 0 ? width : 640;
-        return Math.max(240, screenWidth - 190);
+    private int availableRowWidth() {
+        int screenWidth = width > 0 ? width : FALLBACK_SCREEN_WIDTH;
+        return Math.max(0, screenWidth - ROW_CHROME_WIDTH);
     }
 
     private List<CatalogEntry> filterVisible() {

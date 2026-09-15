@@ -40,7 +40,7 @@ $env:GTSNPONDER_UI_AUTOTEST="viewport"; .\gradlew.bat runClient  # 视口嵌入�
 $env:GTSNPONDER_UI_AUTOTEST="scene"; .\gradlew.bat runClient  # 场景播放自动测试（#5）：载入存档 → 打开 gtceu:coke_oven 的思索屏 → 步骤/旁白/暂停/seek/重播断言 → 截图 run/screenshots/gtsnponder-scene.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="autogen"; .\gradlew.bat runClient  # 自动生成自动测试（#7）：载入存档 → 解析小/中/大三台真实 GT 多方块 → 强制自动生成并播放 → 确定性断言 → 每台两张截图 run/screenshots/gtsnponder-autogen-<n>-<machine>-reveal.png 与 -formed.png（揭示中 / 成型）→ 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="editor"; .\gradlew.bat runClient  # 游戏内编辑器自动测试（#9）：载入存档 → 打开编辑器 → 录制 2 步 + 微调时长 → 保存 → 场景库热重载 → 重放并断言编辑后的旁白 → 截图 run/screenshots/gtsnponder-editor.png → 退出（用后清除该环境变量）
-$env:GTSNPONDER_UI_AUTOTEST="catalog"; .\gradlew.bat runClient  # 图鉴目录自动测试（#11）：载入存档 → 清空进度并按需补种子作者场景 → 打开目录 → 断言列表与场景库一致 + 类别覆盖 → 搜索断言（过滤 / 不可能命中 / 清空）→ 播放某条目并断言进度标记已看 → 重开目录断言进度持久 → 截图 3 张 → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="catalog"; .\gradlew.bat runClient  # 图鉴目录自动测试（#11）：载入存档 → 清空进度并按需补种子作者场景 → 打开目录 → 断言列表与场景库一致 + 类别覆盖 → 搜索断言（过滤 / 不可能命中 / 清空）→ 播放某条目并断言进度标记已看 → 重开目录断言进度持久 → 多尺寸行布局断言（#19：1280x720@2 / 1920x1080@2 / 1280x720@3，每条可见行的标记 / 名称 / id /「相关机器」/「播放」都在行内、两个按钮在屏幕内；窗口被桌面钳制时按实际尺寸告警继续）→ 主流程截图 3 张 + 每尺寸截图 run/screenshots/gtsnponder-catalog-layout-<WxH>-g<S>.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="gtgui"; .\gradlew.bat runClient  # GT 机器界面覆盖按钮自动测试（#12，入口 ④）：载入存档 → 放置真实 gtceu:coke_oven 多方块并以 GT 标准路径打开其 GUI → 断言覆盖按钮出现在真实 GT 机器屏上且目标正确 → 经事件总线投递 MouseButtonPressed.Pre 断言点击打开该目标的播放屏 → 断言非 GT 屏不出现 → 截图 run/screenshots/gtsnponder-gtgui{,-player,-nongt}.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="modules"; .\gradlew.bat runClient  # 模块系统演示自动测试（#14）：载入存档 → 以夹具结构源（两个模块位：具名带效果 / 任意模块）生成场景并播放 → 推进到效果汇总帧断言「模块位区域高亮（多单元）+ 安装生效（空槽被占用）+ 效果汇总旁白」→ 截图 run/screenshots/gtsnponder-modules.png → 重播断言 rewind 清除安装、再播断言确定性重现 → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="systems"; .\gradlew.bat runClient  # 发电·能量网 / 物流管网内容自动测试（#10）：载入存档 → 断言两类内容各 2 个真实 GT 目标经适配器解析且随包场景为 source=mixed → 打开目录断言「发电与能量 / 物流与管网」两类别各含期望目标 → 点击「相关机器」断言相关导航切到同类别兄弟、「全部」恢复 → 分别播放两类主场景断言步骤数与推进到「线缆熔断 / 覆盖板」概念旁白 → 截图 run/screenshots/gtsnponder-systems-{catalog,related,power,logistics}.png → 退出（用后清除该环境变量）
@@ -131,6 +131,13 @@ MultiblockInfoCategory.RECIPE_TYPE, …)` 在 GT 多方块信息页叠加「思�
   未看标记 + 「播放」。条目只收有 `target` 的场景（无目标无法从目录播放）；类别由目标 id 关键词派生
   （v1 格式无类别字段，规则由 `SceneCategoriesTest` 锁定）。入口：快捷键 `key.gtsnponder.catalog`
   （默认 O）、`/gtsnponder catalog`、`PonderEntrypoints.openCatalog()`。
+- **条目行布局（#16 / #19）**：列宽集中在纯 Java `CatalogRowLayout.columnsFor(行可用宽)`——宽敞时 id / 按钮
+  保持设计宽度、名称列吸收余量；窄屏按 id → 相关 → 播放 → 名称 收缩（各自先到可读最小），保证整行
+  （标记 + 名称 + id +「相关机器」+「播放」+ 间距）恒 ≤ 可用宽、尾部按钮不被挤出视口。行可用宽 =
+  屏幕宽 − `SceneCatalogScreen.ROW_CHROME_WIDTH`（164 = 根内边距 16 + 侧栏 132 + 列间距 6 + 滚动条 6 +
+  列表内边距 4；具名常量与 `buildRoot()` 实际布局同步，由 catalog 自动测试在多窗口 / GUI 缩放下按真实
+  控件边界自证）。修复前名称列用 `Sizing.fill()`：余量 ≤ 0 时它撑满整行、把 id 与两个按钮排到视口外
+  （1280x720@GUI 缩放 3 的症状：每行只见标记 + 机器名）。
 - **进度持久化**：`<gameDir>/gtsnponder-progress.json`（`ProgressStore.FILE_NAME`），规范化 JSON
   `{"formatVersion":1,"watched":[…]}`；键取场景 `id`（无则 `target`）。在播放屏打开即标记已看（幂等，
   `ScenePlayerScreen` 构造时写盘）；`PonderProgress`（客户端单例）读写，缺失 / 非法文件退化为空进度。

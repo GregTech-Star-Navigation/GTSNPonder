@@ -1,5 +1,9 @@
 package com.gtsn.ponder.client;
 
+import com.gtsn.lib.ui.layout.Rect;
+import com.gtsn.lib.ui.widget.ButtonWidget;
+import com.gtsn.lib.ui.widget.Stack;
+import com.gtsn.lib.ui.widget.Widget;
 import com.gtsn.ponder.GTSNPonder;
 import com.gtsn.ponder.catalog.CatalogEntry;
 import com.gtsn.ponder.catalog.SceneCatalog;
@@ -46,7 +50,11 @@ import java.util.stream.Collectors;
  *   <li>断言「场景列表非空且与已加载场景库一致」（稳定键集合相等）与「类别覆盖全部条目」；截图；</li>
  *   <li>搜索：设置搜索词后断言全部命中且数量下降（可失败）；再设不可能命中的词断言为空；清空恢复全部；截图；</li>
  *   <li>点击某条目的「播放」→ 断言打开的是该目标的播放屏，且进度被标记为已看；</li>
- *   <li>重开目录 → 断言该条目已显示为已看、总进度 +1；截图后自动退出。</li>
+ *   <li>重开目录 → 断言该条目已显示为已看、总进度 +1；截图；</li>
+ *   <li>多尺寸行布局（工单 #19）：依次切到 1280x720@2 / 1920x1080@2 / 1280x720@3，断言每条可见行
+ *       的 5 个单元（标记 / 名称 / id / 相关 / 播放）都落在行内、尾部两个按钮在屏幕内——修复前
+ *       「名称列 fill 撑满 + 固定列溢出」在 1280x720@3（行宽 ~262px）把 id 与两个按钮挤出视口，
+ *       该断言必红；每个尺寸各截图一张，随后自动退出。</li>
  * </ol>
  *
  * <p>任何断言失败 / 超时都记录 FAIL 证据、截图并退出，保证无人值守可终止。仅客户端加载。</p>
@@ -77,8 +85,21 @@ public final class CatalogAutotest {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    /** 多尺寸行布局检查的窗口 / GUI 缩放组合（工单 #19）：像素宽 × 像素高 × GUI 缩放。 */
+    private static final int[][] LAYOUT_SIZES = {
+            {1280, 720, 2},
+            {1920, 1080, 2},
+            {1280, 720, 3},
+    };
+    /** 每个尺寸检查的前 N 行（列表顶部；足以覆盖首屏且不依赖滚动）。 */
+    private static final int LAYOUT_ROWS_CHECKED = 8;
+    /** 切尺寸后等待布局 / 渲染稳定的 tick 数。 */
+    private static final int LAYOUT_SETTLE_TICKS = 10;
+    /** 等待窗口真正变成目标像素尺寸的上限 tick 数（超时退化为实际可用尺寸，仅告警）。 */
+    private static final int LAYOUT_WINDOW_WAIT_TICKS = 60;
+
     private enum Stage {
-        TITLE, WORLD, OPEN, FILTER, PLAY, VERIFY, GRAB, DONE, FAILED
+        TITLE, WORLD, OPEN, FILTER, PLAY, VERIFY, GRAB, LAYOUT, DONE, FAILED
     }
 
     private static Stage stage = Stage.TITLE;
@@ -88,6 +109,8 @@ public final class CatalogAutotest {
     private static String playedTarget;
     private static int visibleBeforeFilter;
     private static boolean searchApplied;
+    private static int layoutIndex;
+    private static int layoutPhase;
 
     private CatalogAutotest() {
     }
@@ -110,6 +133,7 @@ public final class CatalogAutotest {
             case PLAY -> tickPlay(minecraft);
             case VERIFY -> tickVerify(minecraft);
             case GRAB -> tickGrab(minecraft);
+            case LAYOUT -> tickLayout(minecraft);
             case DONE, FAILED -> tickStop(minecraft);
         }
     }
@@ -372,11 +396,138 @@ public final class CatalogAutotest {
             return;
         }
         grabScreenshot(minecraft, WATCHED_SCREENSHOT);
-        LOGGER.info("[GTSNPonder] catalog autotest PASS: catalog matched the library, search filtered, "
-                + "progress advanced after playing; screenshots {} / {} / {}",
-                LIST_SCREENSHOT, SEARCH_SCREENSHOT, WATCHED_SCREENSHOT);
-        stage = Stage.DONE;
+        LOGGER.info("[GTSNPonder] catalog autotest: main flow PASS (catalog matched the library, search "
+                + "filtered, progress advanced); screenshots {} / {} / {}; checking row layout at {} size(s)",
+                LIST_SCREENSHOT, SEARCH_SCREENSHOT, WATCHED_SCREENSHOT, LAYOUT_SIZES.length);
+        stage = Stage.LAYOUT;
+        layoutIndex = 0;
+        layoutPhase = 0;
         ticks = 0;
+    }
+
+    /**
+     * 多尺寸行布局检查（工单 #19）：窗口 / GUI 缩放矩阵 = {@link #LAYOUT_SIZES}。每尺寸三阶段：
+     * 0) 请求窗口像素尺寸；1) 等 GLFW 生效（超时退化为实际可用尺寸并告警）→ 设 GUI 缩放 + resizeDisplay；
+     * 2) 等布局稳定 → 截图 → 断言行内 5 个单元 + 尾部按钮都在行内 / 屏幕内。
+     */
+    private static void tickLayout(Minecraft minecraft) {
+        if (ticks > STAGE_TIMEOUT_TICKS) {
+            fail(minecraft, "layout stage timed out at size index " + layoutIndex + " phase " + layoutPhase);
+            return;
+        }
+        int[] size = LAYOUT_SIZES[layoutIndex];
+        String label = size[0] + "x" + size[1] + " g" + size[2];
+        Window window = minecraft.getWindow();
+        switch (layoutPhase) {
+            case 0 -> {
+                window.setWindowed(size[0], size[1]);
+                layoutPhase = 1;
+                ticks = 0;
+            }
+            case 1 -> {
+                boolean pixelsMatch = window.getWidth() == size[0] && window.getHeight() == size[1];
+                if (!pixelsMatch && ticks <= LAYOUT_WINDOW_WAIT_TICKS) {
+                    // setWindowed 为异步：等窗口真正变成目标像素尺寸再按新尺寸重排。
+                    return;
+                }
+                if (!pixelsMatch) {
+                    LOGGER.warn("[GTSNPonder] catalog autotest: window clamped to {}x{} (wanted {}x{}); "
+                                    + "running the layout check at the available size",
+                            window.getWidth(), window.getHeight(), size[0], size[1]);
+                }
+                minecraft.options.guiScale().set(size[2]);
+                minecraft.resizeDisplay();
+                LOGGER.info("[GTSNPonder] catalog autotest: layout {} requested -> window={}x{} gui={}x{} scale={}",
+                        label, window.getWidth(), window.getHeight(), window.getGuiScaledWidth(),
+                        window.getGuiScaledHeight(), window.getGuiScale());
+                layoutPhase = 2;
+                ticks = 0;
+            }
+            case 2 -> {
+                if (ticks < LAYOUT_SETTLE_TICKS) {
+                    return;
+                }
+                if (!(minecraft.screen instanceof SceneCatalogScreen screen)) {
+                    fail(minecraft, "catalog screen disappeared while resizing to " + label
+                            + "; current screen=" + minecraft.screen);
+                    return;
+                }
+                String actual = window.getWidth() + "x" + window.getHeight() + "-g" + (int) window.getGuiScale();
+                grabScreenshot(minecraft, "gtsnponder-catalog-layout-" + actual + ".png");
+                if (!assertRowLayout(minecraft, screen, label)) {
+                    return;
+                }
+                layoutIndex++;
+                ticks = 0;
+                if (layoutIndex >= LAYOUT_SIZES.length) {
+                    LOGGER.info("[GTSNPonder] catalog autotest PASS: rows complete and in-bounds at all {} "
+                            + "window/scale sizes", LAYOUT_SIZES.length);
+                    stage = Stage.DONE;
+                } else {
+                    layoutPhase = 0;
+                }
+            }
+            default -> fail(minecraft, "unreachable layout phase " + layoutPhase);
+        }
+    }
+
+    /** 断言前 {@link #LAYOUT_ROWS_CHECKED} 行：5 个单元都在行内，且「相关机器」/「播放」存在且在屏幕内。 */
+    private static boolean assertRowLayout(Minecraft minecraft, SceneCatalogScreen screen, String label) {
+        List<Stack> rows = screen.visibleRows();
+        List<ButtonWidget> related = screen.visibleRelatedButtons();
+        List<ButtonWidget> play = screen.visiblePlayButtons();
+        if (rows.isEmpty() || rows.size() != related.size() || rows.size() != play.size()) {
+            fail(minecraft, "[" + label + "] row widgets out of sync: rows=" + rows.size()
+                    + " related=" + related.size() + " play=" + play.size());
+            return false;
+        }
+        int checked = Math.min(LAYOUT_ROWS_CHECKED, rows.size());
+        for (int i = 0; i < checked; i++) {
+            Stack row = rows.get(i);
+            Rect rowBounds = row.bounds();
+            List<Widget> cells = row.children();
+            if (cells.size() != 5) {
+                fail(minecraft, "[" + label + "] row " + i + " has " + cells.size() + " cells, expected 5");
+                return false;
+            }
+            for (int c = 0; c < cells.size(); c++) {
+                Rect cell = cells.get(c).bounds();
+                if (cell.width() <= 0 || cell.height() <= 0 || !contains(rowBounds, cell)) {
+                    fail(minecraft, "[" + label + "] row " + i + " cell " + c + " escapes the row: cell="
+                            + cell + " row=" + rowBounds);
+                    return false;
+                }
+            }
+            Rect relatedBounds = related.get(i).bounds();
+            if (relatedBounds.width() <= 0 || !onScreen(screen, relatedBounds)) {
+                fail(minecraft, "[" + label + "] row " + i + " 「相关机器」button missing or off-screen: "
+                        + relatedBounds + " screen=" + screen.width + "x" + screen.height);
+                return false;
+            }
+            Rect playBounds = play.get(i).bounds();
+            if (playBounds.width() <= 0 || !onScreen(screen, playBounds)) {
+                fail(minecraft, "[" + label + "] row " + i + " 「播放」button missing or off-screen: "
+                        + playBounds + " screen=" + screen.width + "x" + screen.height);
+                return false;
+            }
+        }
+        Stack firstRow = rows.get(0);
+        LOGGER.info("[GTSNPonder] catalog autotest: layout {} OK (rows={} checked={} screen={}x{}; first row "
+                        + "width={} right={}, play right={})",
+                label, rows.size(), checked, screen.width, screen.height,
+                firstRow.bounds().width(), firstRow.bounds().right(), play.get(0).bounds().right());
+        return true;
+    }
+
+    /** 内矩形是否完全落在 {@code outer} 内。 */
+    private static boolean contains(Rect outer, Rect inner) {
+        return inner.x() >= outer.x() && inner.right() <= outer.right()
+                && inner.y() >= outer.y() && inner.bottom() <= outer.bottom();
+    }
+
+    /** 矩形是否完全落在屏幕内。 */
+    private static boolean onScreen(SceneCatalogScreen screen, Rect rect) {
+        return rect.x() >= 0 && rect.y() >= 0 && rect.right() <= screen.width && rect.bottom() <= screen.height;
     }
 
     private static void tickStop(Minecraft minecraft) {
