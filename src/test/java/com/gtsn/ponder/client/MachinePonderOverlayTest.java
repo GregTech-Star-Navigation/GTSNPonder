@@ -18,6 +18,7 @@ class MachinePonderOverlayTest {
     @AfterEach
     void reset() {
         MachinePonderOverlay.get().reset();
+        MachinePonderOverlay.xei().reset();
     }
 
     @Test
@@ -85,5 +86,80 @@ class MachinePonderOverlayTest {
         overlay.recordOpen();
         overlay.recordOpen();
         assertEquals(2, overlay.opens());
+    }
+
+    // --- XEI page entry (工单 #20)：入口属于「页面」，不随悬停消失，否则点不到 -------------------
+
+    /** page-list 位置（左侧页面按钮列）的锚点矩形：与屏幕右上角按钮不同。 */
+    private static final MachinePonderButton.Box PAGE_ANCHOR =
+            MachinePonderButton.Box.of(240, 87, 20, 18);
+
+    @Test
+    void pageEntrySurvivesThePointerLeavingTheHoveredItem() {
+        MachinePonderOverlay overlay = MachinePonderOverlay.xei();
+        Object page = new Object();
+
+        overlay.presentPage("gtceu:coke_oven", PAGE_ANCHOR, page);
+        assertTrue(overlay.isActive(), "a machine on the page registers the entry");
+
+        // 指针为点击入口而离开悬停物品：本帧不再有机器目标（真实 EMI 悬停解析返回空），但仍是同一页。
+        overlay.presentPage(null, PAGE_ANCHOR, page);
+
+        assertTrue(overlay.isActive(),
+                "the entry must survive the pointer travelling from the hovered item to it");
+        assertEquals(Optional.of("gtceu:coke_oven"), overlay.target(),
+                "the latched target is what the click must open");
+        assertEquals(Optional.of(PAGE_ANCHOR), overlay.button());
+        assertEquals(Optional.of("gtceu:coke_oven"),
+                overlay.click(PAGE_ANCHOR.x() + 1, PAGE_ANCHOR.y() + 1),
+                "the click on the page-list entry resolves the machine");
+    }
+
+    @Test
+    void pageEntryUsesThePageAnchorBoxNotTheScreenCorner() {
+        MachinePonderOverlay overlay = MachinePonderOverlay.xei();
+        overlay.presentPage("gtceu:coke_oven", PAGE_ANCHOR, new Object());
+
+        assertEquals(Optional.of(PAGE_ANCHOR), overlay.button(),
+                "the XEI page entry is drawn at the page anchor, never at the screen corner");
+        assertFalse(MachinePonderButton.bounds(640, 360).contains(
+                        PAGE_ANCHOR.x() + 1, PAGE_ANCHOR.y() + 1),
+                "the page anchor must not coincide with the top-right corner button");
+    }
+
+    @Test
+    void pageEntryClearsWhenThePageChanges() {
+        MachinePonderOverlay overlay = MachinePonderOverlay.xei();
+        overlay.presentPage("gtceu:coke_oven", PAGE_ANCHOR, new Object());
+
+        overlay.presentPage(null, PAGE_ANCHOR, new Object());
+
+        assertFalse(overlay.isActive(), "a different XEI page must not inherit the previous entry");
+        assertTrue(overlay.click(PAGE_ANCHOR.x() + 1, PAGE_ANCHOR.y() + 1).isEmpty());
+    }
+
+    @Test
+    void pageEntryClearsWhenTheScreenIsNoLongerAnXeiPage() {
+        MachinePonderOverlay overlay = MachinePonderOverlay.xei();
+        Object page = new Object();
+        overlay.presentPage("gtceu:coke_oven", PAGE_ANCHOR, page);
+
+        overlay.presentPage(null, null, page);
+
+        assertFalse(overlay.isActive(), "leaving the XEI page (no anchor) drops the entry");
+        assertTrue(overlay.button().isEmpty());
+    }
+
+    @Test
+    void resetDropsTheLatchedPageEntry() {
+        MachinePonderOverlay overlay = MachinePonderOverlay.xei();
+        Object page = new Object();
+        overlay.presentPage("gtceu:coke_oven", PAGE_ANCHOR, page);
+
+        overlay.reset();
+
+        assertFalse(overlay.isActive());
+        overlay.presentPage(null, PAGE_ANCHOR, page);
+        assertFalse(overlay.isActive(), "reset must also forget the page identity");
     }
 }

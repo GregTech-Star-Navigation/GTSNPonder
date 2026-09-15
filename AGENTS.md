@@ -46,6 +46,7 @@ $env:GTSNPONDER_UI_AUTOTEST="modules"; .\gradlew.bat runClient  # 模块系统�
 $env:GTSNPONDER_UI_AUTOTEST="systems"; .\gradlew.bat runClient  # 发电·能量网 / 物流管网内容自动测试（#10）：载入存档 → 断言两类内容各 2 个真实 GT 目标经适配器解析且随包场景为 source=mixed → 打开目录断言「发电与能量 / 物流与管网」两类别各含期望目标 → 点击「相关机器」断言相关导航切到同类别兄弟、「全部」恢复 → 分别播放两类主场景断言步骤数与推进到「线缆熔断 / 覆盖板」概念旁白 → 截图 run/screenshots/gtsnponder-systems-{catalog,related,power,logistics}.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="coverage"; .\gradlew.bat runClient  # 全量覆盖自动测试（#13）：载入存档 → 枚举全部注册多方块（71 台）→ 断言「每台都有可播场景 + 精选关键机器（5 台）有手作讲解 + 零死链」→ 批量重生成全部生成场景到 run/gtsnponder-generated/ → 打开目录断言 71 条全覆盖 + 每条目可解析 → 播放一台按需生成场景断言 source=auto → 截图 run/screenshots/gtsnponder-coverage-{catalog,generated}.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="singleblock"; .\gradlew.bat runClient  # 单方块机器使用场景 + 入口自动测试（#15）：载入存档 → 断言代表性单方块机器（8 台）零死链 + 精选手作（2 台）齐全 + 目录合成使用场景条目 → 放置真实 gtceu:lp_steam_furnace 并以 GT 标准路径打开其 GUI → 断言覆盖按钮出现在真实单方块机器屏上且 target 正确（修复前 resolveTarget 对单方块返回空）→ 投递 MouseButtonPressed.Pre 断言点击打开手作使用场景（source=hand）并断言播放到期望手作旁白 → 断言生成目标 gtceu:lv_centrifuge 解析为 source=auto 使用场景并播放 → 截图 run/screenshots/gtsnponder-singleblock{,-scene,-generated}.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="xeipage"; .\gradlew.bat runClient  # EMI 页内入口位置 + 点击可用性自动测试（#17 / #20）：载入存档 → 经 EMI 官方 API 打开 gtceu:lv_macerator 的真实配方页 → 断言入口登记且落在**页面左侧页面按钮列**（与 GtXeiPageProbe.recipePageBounds 的真实 RecipeScreen.getBounds() 比较）→ **复现 #20 根因**：把中性悬停缝置空并推进若干帧，断言入口仍在且矩形不变 → 投递 MouseButtonPressed.Pre 命中该矩形断言事件被取消且打开的是该机器的播放屏 → 非机器物品（minecraft:stone）重开页断言不绘制入口 → 截图 run/screenshots/gtsnponder-xeipage{,-player,-nontarget}.png → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -125,6 +126,24 @@ MultiblockInfoCategory.RECIPE_TYPE, …)` 在 GT 多方块信息页叠加「思�
   `MultiblockInfoEmiRecipe.getId()`）。点击解析缝合在纯 Java `PonderXeiEntry`（装饰器登记目标 + 按钮屏幕
   矩形，点击处理器命中），由 `PonderXeiEntryTest` headless 锁定。**JEI/EMI 集成本工单为编译期覆盖
   （代码评审）+ 点击解析单测**：dev 未加载 JEI/EMI，故不追加运行时自动测试。
+- **页面入口位置与点击可用性（#20）**：XEI 页内「思索」入口从**屏幕右上角悬浮**改为**页面左侧的页面按钮列**
+  （EMI：`RecipeScreen.getBounds()` 配方面板左缘内缩 5、面板顶之下 30；`workstationLocation=LEFT` 时先还原
+  22px 左侧工作台列；JEI：`RecipesGui.getArea()` + 配方区左内缩 6、头部 32，与 EMI 同列 / 同样式 / 同点击）。
+  几何集中在纯 Java `com.gtsn.ponder.client.XeiPageEntryLayout`（`leftColumnBox` / `labelScale`，`labelScale`
+  把英文 "Ponder" 缩进按钮）；EMI/JEI 适配器只把各自布局换算成「配方面板左上角」，EMI/JEI 类型访问仍只在
+  `com.gtsn.ponder.gt`。**点击失效根因**：入口原先的存在与否取决于「鼠标下的物品」，而用户必须把指针**移开**
+  那件物品才能点到它——指针一离开，悬停解析即返回空，覆盖层当帧把矩形清空（`present(null,…)`），点击自然
+  落空（用户所见「EMI 页内思索不能用」）。**修法**：`PonderXeiPageTargets.Source.entryAnchor` 提供**与悬停
+  无关**的页面锚点（`anchorFor` / `entryFor`），覆盖层 `MachinePonderOverlay.presentPage(target, anchor,
+pageToken)` 把入口**锁存到本页**（页面身份 = 屏幕实例）：指针移向入口期间目标为空也不清除，换页 / 非 XEI 页 /
+  切屏即清除。来源缺席 / 无锚点 / 空矩形 → 不绘制、不消费输入（非目标规则不变）。Forge 的
+  `ScreenEvent.MouseButtonPressed.Pre` 在屏幕自身 `mouseClicked`（EMI/JEI 的处理）**之前**派发，命中即先于
+  EMI/JEI 消费，故入口区域的点击不会被它们吞掉。
+- **自动测试（#20）**：`GTSNPONDER_UI_AUTOTEST=xeipage`（见上）额外断言入口落在**页面左侧按钮列**——与
+  `GtXeiPageProbe.recipePageBounds`（真实 `RecipeScreen.getBounds()` 原始布局，不含本 mod 几何）比较；
+  并**复现根因**：把中性悬停缝置空、推进若干帧，断言入口**仍在且矩形不变**，再投递 `MouseButtonPressed.Pre`
+  命中该矩形、断言事件被取消且打开的是该机器（`gtceu:lv_macerator`）的 `ScenePlayerScreen`。该断言**可失败**：
+  临时把 `presentPage` 的锁存改回「目标空即清空」后，自动测试在「入口消失」一步 FAIL（实测留档）。
 - **图鉴目录**：纯逻辑 `com.gtsn.ponder.catalog`（`SceneCatalog` / `SceneCategories` / `CatalogEntry` /
   `WatchedProgress` / `ProgressStore`，零 MC）；屏幕 `SceneCatalogScreen`（GTSN UI）：类别栏
   （`SceneCategories` 关键词派生：模块 / 概念 / 蒸汽 / 发电 / 物流 / 机器）+ 实时搜索 + 每场景已看 /

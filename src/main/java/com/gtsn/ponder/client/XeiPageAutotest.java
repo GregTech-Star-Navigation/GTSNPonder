@@ -39,10 +39,13 @@ import java.util.Optional;
  *       {@code gtceu:lv_macerator}；</li>
  *   <li>经 EMI 官方 API 打开该物品的真实配方页（{@link GtXeiPageProbe#openEmiRecipePage}），断言当前屏
  *       确为 EMI 页面；</li>
- *   <li>断言覆盖层（{@link MachinePonderOverlay#xei()}）识别机器物品并在屏上登记「思索」按钮（真实渲染
- *       循环驱动），截图为证；</li>
- *   <li>经 Forge 事件总线投递真实的 {@code ScreenEvent.MouseButtonPressed.Pre}，断言事件被取消、覆盖层
- *       记到一次点击 / 打开，且打开的是该物品对应机器的 {@link ScenePlayerScreen}（目标一致）；</li>
+ *   <li>断言覆盖层（{@link MachinePonderOverlay#xei()}）识别机器物品并在屏上登记「思索」入口（真实渲染
+ *       循环驱动），并断言入口落在 <b>EMI 配方面板左侧的页面按钮列</b>（与 {@code RecipeScreen.getBounds()}
+ *       比较，工单 #20），截图为证；</li>
+ *   <li><b>工单 #20 根因复现</b>：把悬停物品置空（真实 EMI 悬停解析在指针离开物品后即返回空）并推进若干帧，
+ *       断言入口<b>仍在且矩形不变</b>——这是修复前失败的那一步（覆盖层当帧清空矩形）；</li>
+ *   <li>经 Forge 事件总线投递真实的 {@code ScreenEvent.MouseButtonPressed.Pre} 命中入口矩形，断言事件被
+ *       取消、覆盖层记到一次点击 / 打开，且打开的是该物品对应机器的 {@link ScenePlayerScreen}（目标一致）；</li>
  *   <li>把悬停物品换成<b>非机器</b>物品（{@code minecraft:stone}）并重开 EMI 配方页，断言覆盖层
  *       <b>不绘制</b>按钮（非目标不绘制）；</li>
  *   <li>退出。</li>
@@ -74,6 +77,8 @@ public final class XeiPageAutotest {
     private static final int WORLD_TIMEOUT_TICKS = 3600;
     private static final int STAGE_TIMEOUT_TICKS = 1200;
     private static final int OVERLAY_SETTLE_TICKS = 10;
+    /** EMI {@code RecipeScreen} 页签条高度（{@code getBounds()} 的 y 比配方面板顶高 26）——位置断言用。 */
+    private static final int TAB_STRIP_HEIGHT = 26;
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -84,7 +89,7 @@ public final class XeiPageAutotest {
             () -> Optional.ofNullable(hoveredItem);
 
     private enum Stage {
-        TITLE, WORLD, OPEN, VERIFY, CLICK, NON_TARGET, NON_TARGET_VERIFY, DONE, FAILED
+        TITLE, WORLD, OPEN, VERIFY, HOVER_OFF, CLICK, NON_TARGET, NON_TARGET_VERIFY, DONE, FAILED
     }
 
     private static Stage stage = Stage.TITLE;
@@ -92,6 +97,8 @@ public final class XeiPageAutotest {
     private static boolean stopped;
     private static boolean worldPrepared;
     private static String target;
+    /** 首帧登记到的入口矩形（#20）：指针离开悬停物品后必须仍在且不变。 */
+    private static MachinePonderButton.Box expectedBox;
 
     private XeiPageAutotest() {
     }
@@ -111,6 +118,7 @@ public final class XeiPageAutotest {
             case WORLD -> tickWorld(minecraft);
             case OPEN -> tickOpen(minecraft);
             case VERIFY -> tickVerify(minecraft);
+            case HOVER_OFF -> tickHoverOff(minecraft);
             case CLICK -> tickClick(minecraft);
             case NON_TARGET -> tickNonTarget(minecraft);
             case NON_TARGET_VERIFY -> tickNonTargetVerify(minecraft);
@@ -215,13 +223,76 @@ public final class XeiPageAutotest {
                     + minecraft.screen.width + "x" + minecraft.screen.height);
             return;
         }
+        // 工单 #20：入口必须落在 EMI 配方面板左侧的页面按钮列（不再是屏幕右上角悬浮）。
+        MachinePonderButton.Box page = GtXeiPageProbe.recipePageBounds(minecraft.screen).orElse(null);
+        if (page == null) {
+            fail(minecraft, "could not read the EMI recipe page layout for the position assertion (screen="
+                    + describeScreen(minecraft.screen) + ")");
+            return;
+        }
+        LOGGER.info("[GTSNPonder] xeipage autotest: entry box={} vs EMI page bounds={} ({}x{} screen)",
+                box, page, minecraft.screen.width, minecraft.screen.height);
+        if (box.x() >= minecraft.screen.width / 2
+                || box.right() > page.x() + page.width() / 4) {
+            fail(minecraft, "the entry is not in the page's left page-button column (box=" + box
+                    + " page=" + page + ") - it looks like the old top-right floating button");
+            return;
+        }
+        if (box.x() < page.x() || box.right() > page.x() + page.width() / 2) {
+            fail(minecraft, "the entry is not on the EMI page's left half: box=" + box + " page=" + page);
+            return;
+        }
+        if (box.y() < page.y() + TAB_STRIP_HEIGHT || box.bottom() > page.y() + page.height() / 2) {
+            fail(minecraft, "the entry is not in the page's top-left button block: box=" + box
+                    + " page=" + page);
+            return;
+        }
         target = MACHINE_ITEM;
-        LOGGER.info("[GTSNPonder] xeipage autotest: overlay button registered at {} ({}x{} screen), target {}",
-                box, minecraft.screen.width, minecraft.screen.height, target);
+        expectedBox = box;
+        LOGGER.info("[GTSNPonder] xeipage autotest: entry registered in the page-list column at {} for {}",
+                box, target);
         grabScreenshot(minecraft, OVERLAY_SCREENSHOT);
 
-        double clickX = box.x() + box.width() / 2.0d;
-        double clickY = box.y() + box.height() / 2.0d;
+        // 工单 #20 根因复现：真实 EMI 悬停解析只在指针压在物品上时给出机器；用户必须把指针移开物品
+        // 才能点到入口。此处把悬停来源置空以模拟「指针正移向入口」的那些帧——入口必须仍在。
+        // 只保留测试来源：EMI 的实时来源可能晚于本测试注册，会把「无悬停」兜底成真实悬停而掩盖复现
+        // （只影响中性悬停缝；页面锚点缝不受影响）。
+        PonderXeiItemHover.get().reset();
+        PonderXeiItemHover.get().register(TEST_HOVER);
+        hoveredItem = null;
+        stage = Stage.HOVER_OFF;
+        ticks = 0;
+    }
+
+    /**
+     * 指针离开悬停物品后的帧：断言入口<b>仍在</b>（锁存到本页）且矩形不变，然后点击它必须打开场景。
+     * 这是 #20 的 fail-able 复现——修复前 {@code present(null,...)} 会把矩形清空，点击落空。
+     */
+    private static void tickHoverOff(Minecraft minecraft) {
+        if (ticks < OVERLAY_SETTLE_TICKS) {
+            return;
+        }
+        MachinePonderOverlay overlay = MachinePonderOverlay.xei();
+        if (!overlay.isActive()) {
+            fail(minecraft, "the entry vanished once the pointer left the hovered item - it cannot be clicked"
+                    + " (root cause of #20; target=" + overlay.target().orElse(null) + ")");
+            return;
+        }
+        if (!expectedBox.equals(overlay.button().orElse(null))) {
+            fail(minecraft, "the entry moved after the pointer left the hovered item: expected "
+                    + expectedBox + " got " + overlay.button().orElse(null));
+            return;
+        }
+        if (!MACHINE_ITEM.equals(overlay.target().orElse(null))) {
+            fail(minecraft, "the latched target changed while moving onto the entry: expected " + MACHINE_ITEM
+                    + " got " + overlay.target().orElse(null));
+            return;
+        }
+        LOGGER.info("[GTSNPonder] xeipage autotest: entry survived the hover loss at {} (clicks={}, opens={})",
+                expectedBox, overlay.clicks(), overlay.opens());
+
+        double clickX = expectedBox.x() + expectedBox.width() / 2.0d;
+        double clickY = expectedBox.y() + expectedBox.height() / 2.0d;
         boolean canceled = MinecraftForge.EVENT_BUS.post(
                 new ScreenEvent.MouseButtonPressed.Pre(minecraft.screen, clickX, clickY, 0));
         LOGGER.info("[GTSNPonder] xeipage autotest: posted MouseButtonPressed.Pre at ({}, {}), canceled={}, "
