@@ -59,27 +59,27 @@ class SystemScenesTest {
                     List.of("ponder.gtsnponder.power.narration.voltage",
                             "ponder.gtsnponder.power.narration.overvoltage",
                             "ponder.gtsnponder.power.narration.burning"),
-                    9),
+                    11),
             new ExpectedScene("power_transformer.json", "gtsnponder:power_transformer",
                     "gtceu:active_transformer", SceneCategories.POWER,
                     List.of("ponder.gtsnponder.power.narration.voltage",
                             "ponder.gtsnponder.power.narration.overvoltage",
                             "ponder.gtsnponder.power.narration.burning"),
-                    9),
+                    11),
             new ExpectedScene("logistics_network.json", "gtsnponder:logistics_network",
                     "gtceu:steel_multiblock_tank", SceneCategories.LOGISTICS,
                     List.of("ponder.gtsnponder.logistics.narration.item_pipes",
                             "ponder.gtsnponder.logistics.narration.fluid_pipes",
                             "ponder.gtsnponder.logistics.narration.cables",
                             "ponder.gtsnponder.logistics.narration.covers"),
-                    10),
+                    12),
             new ExpectedScene("logistics_pump.json", "gtsnponder:logistics_pump",
                     "gtceu:primitive_pump", SceneCategories.LOGISTICS,
                     List.of("ponder.gtsnponder.logistics.narration.item_pipes",
                             "ponder.gtsnponder.logistics.narration.fluid_pipes",
                             "ponder.gtsnponder.logistics.narration.cables",
                             "ponder.gtsnponder.logistics.narration.covers"),
-                    10));
+                    12));
 
     private static SceneData load(ExpectedScene expected) throws IOException {
         Path file = PONDER_DIR.resolve(expected.file());
@@ -171,8 +171,10 @@ class SystemScenesTest {
             runner.tick(SceneRunner.totalTime(scene));
 
             assertTrue(runner.isComplete(), expected.file() + " did not finish playback");
-            assertTrue(world.state().sections().get("shell"),
-                    expected.file() + " never revealed the structure shell");
+            for (String layer : List.of("layer.0", "layer.1", "layer.2")) {
+                assertTrue(world.state().sections().get(layer),
+                        expected.file() + " never revealed structure " + layer);
+            }
             assertEquals(Boolean.TRUE, world.state().highlights().get("controller"),
                     expected.file() + " never highlighted the controller");
             assertEquals(List.of("controller"), world.state().formedPulses(),
@@ -198,8 +200,10 @@ class SystemScenesTest {
             assertEquals(0.0d, runner.time(), 1.0e-9d, expected.file());
             assertEquals(0, runner.currentStepIndex(), expected.file());
             assertNotEquals(played, world.state(), expected.file() + " rewind must change world state back");
-            assertEquals(Boolean.TRUE, world.state().sections().get("shell"),
-                    expected.file() + ": the reveal step is re-applied at t=0");
+            assertEquals(Boolean.TRUE, world.state().sections().get("layer.0"),
+                    expected.file() + ": the first reveal step is re-applied at t=0");
+            assertFalse(Boolean.TRUE.equals(world.state().sections().get("layer.2")),
+                    expected.file() + ": later reveal steps are cleared on rewind");
             assertFalse(world.state().highlights().containsKey("controller"),
                     expected.file() + ": a later highlight is cleared on rewind");
         }

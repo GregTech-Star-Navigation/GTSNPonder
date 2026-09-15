@@ -47,6 +47,8 @@ $env:GTSNPONDER_UI_AUTOTEST="systems"; .\gradlew.bat runClient  # 发电·能量
 $env:GTSNPONDER_UI_AUTOTEST="coverage"; .\gradlew.bat runClient  # 全量覆盖自动测试（#13）：载入存档 → 枚举全部注册多方块（71 台）→ 断言「每台都有可播场景 + 精选关键机器（5 台）有手作讲解 + 零死链」→ 批量重生成全部生成场景到 run/gtsnponder-generated/ → 打开目录断言 71 条全覆盖 + 每条目可解析 → 播放一台按需生成场景断言 source=auto → 截图 run/screenshots/gtsnponder-coverage-{catalog,generated}.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="singleblock"; .\gradlew.bat runClient  # 单方块机器使用场景 + 入口自动测试（#15）：载入存档 → 断言代表性单方块机器（8 台）零死链 + 精选手作（2 台）齐全 + 目录合成使用场景条目 → 放置真实 gtceu:lp_steam_furnace 并以 GT 标准路径打开其 GUI → 断言覆盖按钮出现在真实单方块机器屏上且 target 正确（修复前 resolveTarget 对单方块返回空）→ 投递 MouseButtonPressed.Pre 断言点击打开手作使用场景（source=hand）并断言播放到期望手作旁白 → 断言生成目标 gtceu:lv_centrifuge 解析为 source=auto 使用场景并播放 → 截图 run/screenshots/gtsnponder-singleblock{,-scene,-generated}.png → 退出（用后清除该环境变量）
 $env:GTSNPONDER_UI_AUTOTEST="xeipage"; .\gradlew.bat runClient  # EMI 页内入口位置 + 点击可用性自动测试（#17 / #20）：载入存档 → 经 EMI 官方 API 打开 gtceu:lv_macerator 的真实配方页 → 断言入口登记且落在**页面左侧页面按钮列**（与 GtXeiPageProbe.recipePageBounds 的真实 RecipeScreen.getBounds() 比较）→ **复现 #20 根因**：把中性悬停缝置空并推进若干帧，断言入口仍在且矩形不变 → 投递 MouseButtonPressed.Pre 命中该矩形断言事件被取消且打开的是该机器的播放屏 → 非机器物品（minecraft:stone）重开页断言不绘制入口 → 截图 run/screenshots/gtsnponder-xeipage{,-player,-nontarget}.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="variants"; .\gradlew.bat runClient  # 多变体播放自动测试（#21 反馈 2）：载入存档 → 找一台可重复结构段多方块（assembly_line 等，适配器返回 ≥2 结构页）→ 断言长变体结构更大 / 步骤不同且生成字节确定 → 播放短变体（default）断言变体按钮存在 → 点击「变体」按钮切到下一变体断言结构更大 → 截图 run/screenshots/gtsnponder-variants-{short,long}.png → 退出（用后清除该环境变量）
+$env:GTSNPONDER_UI_AUTOTEST="blockinfo"; .\gradlew.bat runClient  # 点击方块看名称自动测试（#21 反馈 3）：载入存档 → 打开 gtceu:lv_macerator 使用场景 → 指针移到视口中心并点击 → 断言覆盖层显示该方块本地化名称（block.gtceu.lv_macerator）且选中单元为机器本体 → 再点同一方块断言覆盖层关闭 → 再点显示并截图 run/screenshots/gtsnponder-blockinfo.png → 退出（用后清除该环境变量）
 ```
 
 ### 自动生成（#7）
@@ -235,6 +237,36 @@ pageToken)` 把入口**锁存到本页**（页面身份 = 屏幕实例）：指�
 - **目录接线**：`SceneCatalog.of(scenes, registeredTargets, usageTargets, progress)` 为代表性单方块目标合成条目——键取 `SingleBlockUsageGenerator.sceneIdFor(target)`（`gtsnponder:usage_<sanitized>`，与按需产物 `id` 一致故已看标记可点亮），标题取 GT 方块名键；`SceneCatalogScreen` 新增 `usageTargets` 形参（旧签名保留）。类别由目标 id 关键词派生（蒸汽 → `steam`，电力 → `machines`）。
 - **文案**：`SingleBlockUsageGenerator` 的模板键与手作键经 `runData` 产出中英（**改动后必须重跑 `runData` 并提交产物**）；`GeneratedLangKeysTest` 守卫覆盖。
 - **证据**：headless 单测 `SingleBlockMachineSourceTest` / `SingleBlockUsageGeneratorTest`（使用场景形状 / 确定性 / 可播放 / 旁白键与参数）、`SingleBlockScenesTest`（代表性 / 手作文件 / 分析器）、`SceneCatalogTest`（使用条目合成 / 已看键）= **288** 项单元测试；GameTest `SingleBlockGameTests`（代表性 8 台真实注册表解析 + 生成确定性 + 元素可解析；精选手作随包文件 + 覆盖数字）= **19** 项 GameTest（含 #13 的 17 项）；客户端自动测试 `GTSNPONDER_UI_AUTOTEST=singleblock`（见上：真实单方块机器 GUI + 覆盖按钮 + 点击打开手作使用场景 + 生成使用场景 + 截图）。
+
+### 多变体 / 点击方块看名称 / 搭建序列一致性（#21）
+
+- **背景（三条用户反馈）**：① 部分机器看不到搭建过程；② 可重复结构段的机器只能看默认（短）变体；
+  ③ 无法点击场景内方块查看名称。
+- **搭建序列审计**：GameTest `VariantGameTests.everyRegisteredMultiblockBuildsIncrementallyAndVariantsAreEnumerated`
+  枚举全部注册多方块（71 台）并断言**每台默认生成场景都含 `build.*` 揭示序列**（一次性审计留档：71/71 通过）。
+  审计发现的真实缺口是**随包手作场景覆盖**：4 条 `source=mixed` 概念场景（`power_energy` / `power_transformer` /
+  `logistics_network` / `logistics_pump`）原先只有一次 `showSection`（无搭建过程），已按既有策略补成
+  **逐层揭示**（`layer.0/1/2`，对应目标结构均为 3 层）；`coke_oven.json` 本就是多段 reveal 不在此列。
+  单方块机器（`SingleBlockUsageGenerator`）**不伪造结构搭建**，而是补一段 `outline.machine`（蓝色本体轮廓），
+  与既有 `highlight.machine`（金色）形成「高亮 → 轮廓」两段式节奏；`generatorVersion` 提升为 `usage-3`，
+  两条手作单方块场景（`steam_furnace` / `lv_macerator`）同步加该步。
+- **多变体**：`GtStructureAdapter.variantsById(id)` 把 `getMatchingShapes()` 的**每一页**翻译为独立结构源
+  （默认 `byId` 仍只展开第一页，不引入按需解析的性能回归）；纯逻辑 `com.gtsn.ponder.generate.SceneVariants`
+  为每页产出稳定 `Spec`（id + 本地化标签键 + 参数）：单页 `default`、两页 `default`/`long`（短 / 长）、
+  多页按变化轴长度 `slices_<n>`（「n 节」），尺寸无规律变化时退化为 `v<i>`（「变体 i」）。`SceneGenerator` 新增
+  `generate(source, variantId, sceneId)` 重载（默认路径不变，第一页仍是 `sceneIdFor(target)` = 目录 / 进度键兼容）。
+  播放屏（`ScenePlayerScreen`）在变体 >1 时显示「变体」按钮循环切换；入口 `PonderEntrypoints.variantOptions/
+openVariant`。实测：**16 台**机器有 ≥2 变体（装配线 13 页 50→170 方块、蒸馏塔 11、分馏塔 12、合金冶炼炉 / 裂化器 /
+  高炉 / 工业熔炉 / 大型化学反应釜 8 等）。
+- **点击方块看名称**：纯逻辑 `com.gtsn.ponder.bridge.BlockInfoResolver`（结构坐标 → 方块名键 `block.<ns>.<path>`
+  - 角色键），GT 等级附加信息走 `com.gtsn.ponder.gt.GtBlockInfo.tierKeyFor`（GT import 仍只在 `.gt`）。
+    `LdlibSceneViewport` 记录指针坐标并交给 LDLib `drawInBackground` 做拾取（`pickedBlock()` 读 `hoverPosFace`）；
+    `ScenePlayerScreen` 在「视口内按下 + 未拖拽」时选中方块并在点击处绘制覆盖层（名称 + 角色 + 等级），
+    再点同一方块 / 点空处关闭。
+- **证据**：headless 单测 `SceneVariantsTest`（命名 / 变体 id / 每变体确定性 / 变体场景仍是冻结 v1）、
+  `BlockInfoResolverTest`（名称 / 角色 / 空态）；GameTest `VariantGameTests`（合成两页定义 → 两个尺寸不同的变体；
+  71 台搭建序列审计；162 个变体场景可解析 + 确定性）= 23 项 GameTest；客户端自动测试 `variants` / `blockinfo`（见上）。
+  文案：变体标签键（`ponder.gtsnponder.variant.*`）经 `runData` 产出中英。
 
 ### 依赖与类加载纪律
 

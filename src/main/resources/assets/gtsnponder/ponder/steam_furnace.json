@@ -51,6 +51,15 @@
       }
     },
     {
+      "id": "outline.machine",
+      "type": "outline",
+      "duration": 24,
+      "targets": ["machine"],
+      "params": {
+        "visible": true
+      }
+    },
+    {
       "id": "text.usage",
       "type": "text",
       "duration": 60,

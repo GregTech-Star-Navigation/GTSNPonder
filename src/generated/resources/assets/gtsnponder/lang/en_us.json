@@ -307,6 +307,11 @@
   "ponder.gtsnponder.usage.lp_steam_furnace.usage": "Feed in ore or food and plenty of steam: it smelts one item at a time and needs no power cable.",
   "ponder.gtsnponder.usage.lv_macerator.intro": "This is the Basic Macerator - the LV workhorse that grinds ores into dusts.",
   "ponder.gtsnponder.usage.lv_macerator.usage": "Put ore in the input slot, give it LV power, and pull the dust from the output slot.",
+  "ponder.gtsnponder.variant.default": "Default",
+  "ponder.gtsnponder.variant.long": "Long",
+  "ponder.gtsnponder.variant.numbered": "Variant %s",
+  "ponder.gtsnponder.variant.short": "Short",
+  "ponder.gtsnponder.variant.slices": "%s sections",
   "ponder.gtsnponder.xei.open": "Open this machine's ponder tutorial",
   "ponder.gtsnponder.xei.open.short": "Ponder"
 }

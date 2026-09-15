@@ -9,6 +9,7 @@ import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.GtTierNames;
 import com.gtsn.ponder.generate.MachineDescriptions;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.generate.SceneVariants;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import com.gtsn.ponder.gt.GtMultiblockCatalog;
 import com.gtsn.ponder.structure.StructureRole;
@@ -113,6 +114,12 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(GeneratedKeys.LEGEND_HATCH, "Hatch / bus (blue)");
         keys.put(GeneratedKeys.LEGEND_MODULE_SLOT, "Module slot (green)");
 
+        keys.put(SceneVariants.LABEL_DEFAULT, "Default");
+        keys.put(SceneVariants.LABEL_SHORT, "Short");
+        keys.put(SceneVariants.LABEL_LONG, "Long");
+        keys.put(SceneVariants.LABEL_SLICES, "%s sections");
+        keys.put(SceneVariants.LABEL_NUMBERED, "Variant %s");
+
         keys.put("ponder.gtsnponder.message.no_target", "No GT machine or multiblock in view (within reach).");
         keys.put("ponder.gtsnponder.message.no_item",
                 "No ponderable item under the cursor (hover a GT machine item in your inventory / JEI / EMI).");
@@ -181,6 +188,12 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(GeneratedKeys.LEGEND_CONTROLLER, "控制器（金色）");
         keys.put(GeneratedKeys.LEGEND_HATCH, "仓口 / 总线（蓝色）");
         keys.put(GeneratedKeys.LEGEND_MODULE_SLOT, "模块位（绿色）");
+
+        keys.put(SceneVariants.LABEL_DEFAULT, "默认");
+        keys.put(SceneVariants.LABEL_SHORT, "短");
+        keys.put(SceneVariants.LABEL_LONG, "长");
+        keys.put(SceneVariants.LABEL_SLICES, "%s 节");
+        keys.put(SceneVariants.LABEL_NUMBERED, "变体 %s");
 
         keys.put("ponder.gtsnponder.message.no_target", "视线内没有格雷科技机器 / 多方块（需在触及范围内）。");
         keys.put("ponder.gtsnponder.message.no_item", "鼠标下没有可思索的物品（把光标移到背包 / JEI / EMI 中的格雷科技机器物品上）。");

@@ -8,6 +8,7 @@ import com.gtsn.ponder.engine.model.SceneData;
 import com.gtsn.ponder.engine.model.SceneDataWriter;
 import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.generate.SceneVariants;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import com.gtsn.ponder.gt.GtMultiblockCatalog;
 import com.gtsn.ponder.gt.GtSingleBlockAdapter;
@@ -218,8 +219,84 @@ public final class PonderEntrypoints {
             return false;
         }
         Resolved ready = resolved.get();
+        // 多变体目标：把全部变体描述交给播放屏，使「变体」按钮可用（工单 #21 反馈 2）。
+        List<SceneVariants.Spec> specs = List.of();
+        int index = 0;
+        if (!forceGenerate) {
+            List<VariantOption> options = variantOptions(target);
+            if (options.size() > 1) {
+                specs = options.stream().map(VariantOption::spec).toList();
+                for (int i = 0; i < options.size(); i++) {
+                    if (options.get(i).scene().id().equals(ready.scene().id())) {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+        }
+        List<SceneVariants.Spec> variantSpecs = specs;
+        int variantIndex = index;
         minecraft.execute(() -> minecraft.setScreen(
-                new ScenePlayerScreen(ready.scene(), ready.structure(), minecraft.level)));
+                new ScenePlayerScreen(ready.scene(), ready.structure(), minecraft.level,
+                        target, variantSpecs, variantIndex)));
+        return true;
+    }
+
+    /**
+     * 一个目标的变体选项（工单 #21 反馈 2）：变体描述 + 该变体的场景与结构源。
+     */
+    public record VariantOption(SceneVariants.Spec spec, SceneData scene, StructureSource structure) {
+    }
+
+    /**
+     * 枚举一个目标的全部变体（工单 #21 反馈 2）：多方块经 {@link GtStructureAdapter#variantsById}
+     * 取全部结构页（可重复结构段的机器会有「短 / 长」「n 节」多个），第一页保留手作场景 / 默认 id；
+     * 单方块或无多变体者返回单个默认选项。解析不出时为空列表。
+     */
+    public static List<VariantOption> variantOptions(String target) {
+        List<StructureSource> shapes = GtStructureAdapter.variantsById(target);
+        if (shapes.isEmpty()) {
+            Optional<Resolved> resolved = resolve(target, false);
+            if (resolved.isEmpty()) {
+                return List.of();
+            }
+            Resolved single = resolved.get();
+            return List.of(new VariantOption(
+                    new SceneVariants.Spec(SceneVariants.VARIANT_DEFAULT, SceneVariants.LABEL_DEFAULT, List.of()),
+                    single.scene(), single.structure()));
+        }
+        List<SceneVariants.Spec> specs = SceneVariants.specs(shapes);
+        SceneData authored = SceneLibrary.get().sceneForTarget(target).orElse(null);
+        List<VariantOption> options = new ArrayList<>(shapes.size());
+        for (int i = 0; i < shapes.size(); i++) {
+            StructureSource shape = shapes.get(i);
+            SceneData scene = i == 0 && authored != null ? authored : SceneVariants.sceneFor(shape, specs.get(i));
+            options.add(new VariantOption(specs.get(i), scene, shape));
+        }
+        return List.copyOf(options);
+    }
+
+    /**
+     * 打开目标的指定变体（播放屏「变体」按钮的确定性入口，工单 #21 反馈 2）。变体下标越界 /
+     * 解析不出时显示空态提示并返回假。
+     */
+    public static boolean openVariant(String target, int index) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            message("ponder.gtsnponder.message.no_world");
+            return false;
+        }
+        List<VariantOption> options = variantOptions(target);
+        if (options.isEmpty() || index < 0 || index >= options.size()) {
+            message("ponder.gtsnponder.message.no_scene", target);
+            return false;
+        }
+        VariantOption chosen = options.get(index);
+        List<SceneVariants.Spec> specs = options.stream().map(VariantOption::spec).toList();
+        int selected = index;
+        minecraft.execute(() -> minecraft.setScreen(
+                new ScenePlayerScreen(chosen.scene(), chosen.structure(), minecraft.level,
+                        target, specs, selected)));
         return true;
     }
 

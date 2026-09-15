@@ -66,6 +66,13 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
 
     private Rect bounds = Rect.ZERO;
     private float partialTick;
+    /**
+     * 最近一次指针位置（<b>GUI 绝对坐标</b>）。渲染时转交给 {@link SceneWidget#drawInBackground}，
+     * 使 LDLib 以该坐标为鼠标位置做拾取（{@code hoverPosFace}）——真实游玩时由屏幕的
+     * {@code mouseMoved} / {@code mouseClicked} 写入，自动测试可直接写入以获得确定性（工单 #21 反馈 3）。
+     */
+    private double pointerX = Double.NaN;
+    private double pointerY = Double.NaN;
     /** 取景自适应目标填充比例；{@code <= 0} 表示按场景给的距离（不做自适应）。 */
     private double fitMargin;
     private int appliedX = Integer.MIN_VALUE;
@@ -162,6 +169,24 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
     /** LDLib 侧实际生效的俯仰。 */
     public float ldlibRotationPitch() {
         return sceneWidget.getRotationPitch();
+    }
+
+    /**
+     * 设定当前指针位置（GUI 绝对坐标）。渲染时以它作为 LDLib 的鼠标坐标，从而 {@code hoverPosFace}
+     * 反映玩家当前指向的方块（用于「点击方块看名称」，工单 #21 反馈 3）。非有限值表示未知（不拾取）。
+     */
+    public void setPointer(double guiX, double guiY) {
+        this.pointerX = guiX;
+        this.pointerY = guiY;
+    }
+
+    /**
+     * 当前指针指向的方块（结构局部坐标 == 虚世界坐标）。LDLib 每帧按 {@link #setPointer} 的坐标做
+     * 射线拾取并写入 {@code hoverPosFace}；无命中（空处 / 指针未知）返回空。
+     */
+    public java.util.Optional<BlockPos> pickedBlock() {
+        var face = sceneWidget.getHoverPosFace();
+        return face == null ? java.util.Optional.empty() : java.util.Optional.of(face.pos);
     }
 
     @Override
@@ -341,7 +366,9 @@ public final class LdlibSceneViewport implements SceneViewport, ViewportRenderer
         }
         syncWidgetGeometry(bounds);
         sceneWidget.updateScreen();
-        sceneWidget.drawInBackground(graphicsContext.graphics(), 0, 0, partialTick);
+        int pointerGuiX = Double.isFinite(pointerX) ? (int) Math.round(pointerX) : 0;
+        int pointerGuiY = Double.isFinite(pointerY) ? (int) Math.round(pointerY) : 0;
+        sceneWidget.drawInBackground(graphicsContext.graphics(), pointerGuiX, pointerGuiY, partialTick);
     }
 
     /** 只在几何变化时改 LDLib 控件位置 / 尺寸（避免每帧触发内部重算）。 */

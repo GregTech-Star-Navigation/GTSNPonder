@@ -8,9 +8,19 @@
   "generatorVersion": "hand-1",
   "elements": [
     {
-      "id": "shell",
+      "id": "layer.0",
       "kind": "section",
-      "params": { "selector": "all" }
+      "params": { "selector": "layer", "y": 0 }
+    },
+    {
+      "id": "layer.1",
+      "kind": "section",
+      "params": { "selector": "layer", "y": 1 }
+    },
+    {
+      "id": "layer.2",
+      "kind": "section",
+      "params": { "selector": "layer", "y": 2 }
     },
     {
       "id": "controller",
@@ -20,10 +30,22 @@
   ],
   "steps": [
     {
-      "id": "reveal_shell",
+      "id": "reveal_layer_0",
       "type": "showSection",
-      "duration": 30,
-      "targets": ["shell"]
+      "duration": 18,
+      "targets": ["layer.0"]
+    },
+    {
+      "id": "reveal_layer_1",
+      "type": "showSection",
+      "duration": 18,
+      "targets": ["layer.1"]
+    },
+    {
+      "id": "reveal_layer_2",
+      "type": "showSection",
+      "duration": 18,
+      "targets": ["layer.2"]
     },
     {
       "id": "talk_intro",

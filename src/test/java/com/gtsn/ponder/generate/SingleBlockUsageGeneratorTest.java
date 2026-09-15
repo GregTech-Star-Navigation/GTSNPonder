@@ -136,7 +136,8 @@ class SingleBlockUsageGeneratorTest {
         SceneData scene = SingleBlockUsageGenerator.generate(electrolyzer());
 
         assertEquals(List.of("focus.camera", "build.machine", "text.purpose", "highlight.machine",
-                "text.setup", "text.inputs", "text.outputs", "text.energy", "text.pitfalls", "text.covers"),
+                "text.setup", "outline.machine", "text.inputs", "text.outputs", "text.energy",
+                "text.pitfalls", "text.covers"),
                 scene.steps().stream().map(SceneStep::id).toList());
 
         assertTrue(scene.steps().stream().noneMatch(s -> s.id().startsWith("formed.")),
@@ -157,6 +158,16 @@ class SingleBlockUsageGeneratorTest {
         assertEquals(StepType.HIGHLIGHT, highlight.type());
         assertEquals(List.of(SingleBlockUsageGenerator.ELEMENT_MACHINE), highlight.targets());
         assertEquals(Boolean.TRUE, highlight.params().get("visible"));
+
+        // 反馈 1（工单 #21）：本体高亮之外还有一段蓝色轮廓，形成「高亮 → 轮廓」的两段式节奏。
+        SceneStep outline = step(scene, "outline.machine").orElseThrow();
+        assertEquals(StepType.OUTLINE, outline.type());
+        assertEquals(List.of(SingleBlockUsageGenerator.ELEMENT_MACHINE), outline.targets());
+        assertEquals(Boolean.TRUE, outline.params().get("visible"));
+        long highlightPhases = scene.steps().stream()
+                .filter(s -> s.type() == StepType.HIGHLIGHT || s.type() == StepType.OUTLINE)
+                .count();
+        assertTrue(highlightPhases >= 2, "usage scenes need a highlight sequence, not a single frame");
     }
 
     @Test

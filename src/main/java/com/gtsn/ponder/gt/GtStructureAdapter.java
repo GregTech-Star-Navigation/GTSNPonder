@@ -199,8 +199,14 @@ public final class GtStructureAdapter {
         }
     }
 
-    /** 把某个多方块定义翻译为结构源（其第一个结构页）。 */
+    /**
+     * 把某个多方块定义翻译为结构源（其<b>第一个有效结构页</b> = 默认变体）。只展开第一页，故
+     * 与既有按需解析路径同代价；全部变体的枚举见 {@link #variantsOf}.
+     */
     public static Optional<StructureSource> toSource(MultiblockMachineDefinition definition) {
+        if (definition == null) {
+            return Optional.empty();
+        }
         List<MultiblockShapeInfo> shapes;
         try {
             shapes = definition.getMatchingShapes();
@@ -210,11 +216,83 @@ public final class GtStructureAdapter {
         if (shapes == null || shapes.isEmpty()) {
             return Optional.empty();
         }
-        BlockInfo[][][] grid = shapes.get(0).getBlocks();
-        if (grid == null || grid.length == 0) {
-            return Optional.empty();
+        for (MultiblockShapeInfo shape : shapes) {
+            if (shape == null) {
+                continue;
+            }
+            BlockInfo[][][] grid;
+            try {
+                grid = shape.getBlocks();
+            } catch (RuntimeException failure) {
+                continue;
+            }
+            if (grid == null || grid.length == 0) {
+                continue;
+            }
+            StructureSource source = convert(definition, grid);
+            if (!source.isEmpty()) {
+                return Optional.of(source);
+            }
         }
-        return Optional.of(convert(definition, grid));
+        return Optional.empty();
+    }
+
+    /**
+     * 全部结构页（变体）——把 {@link MultiblockMachineDefinition#getMatchingShapes()} 的<b>每一页</b>
+     * 都翻译为独立结构源（工单 #21 反馈 2）。可重复结构段的机器（如装配线 5–16 节）会有多页，
+     * 因此同一目标可产出多个变体场景（见 {@code com.gtsn.ponder.generate.SceneVariants}）。
+     *
+     * <p>页顺序即 GT 产出顺序（默认第一页 = 最短 / 默认）；无形状 / 畸形页（{@code null}、
+     * 空网格、转换后无非空方块）被跳过。绝不抛出（适配层「失败即降级」纪律）。</p>
+     */
+    public static List<StructureSource> variantsOf(MultiblockMachineDefinition definition) {
+        if (definition == null) {
+            return List.of();
+        }
+        List<MultiblockShapeInfo> shapes;
+        try {
+            shapes = definition.getMatchingShapes();
+        } catch (RuntimeException failure) {
+            return List.of();
+        }
+        if (shapes == null || shapes.isEmpty()) {
+            return List.of();
+        }
+        List<StructureSource> variants = new ArrayList<>();
+        for (MultiblockShapeInfo shape : shapes) {
+            if (shape == null) {
+                continue;
+            }
+            BlockInfo[][][] grid;
+            try {
+                grid = shape.getBlocks();
+            } catch (RuntimeException failure) {
+                continue;
+            }
+            if (grid == null || grid.length == 0) {
+                continue;
+            }
+            StructureSource source = convert(definition, grid);
+            if (!source.isEmpty()) {
+                variants.add(source);
+            }
+        }
+        return List.copyOf(variants);
+    }
+
+    /**
+     * 按机器 id 解析其<b>全部结构页（变体）</b>；不是多方块 / 不存在 / 无结构页时为空列表。
+     */
+    public static List<StructureSource> variantsById(String machineId) {
+        ResourceLocation location = ResourceLocation.tryParse(machineId);
+        if (location == null) {
+            return List.of();
+        }
+        MachineDefinition definition = GTRegistries.MACHINES.get(location);
+        if (!(definition instanceof MultiblockMachineDefinition multiblock)) {
+            return List.of();
+        }
+        return variantsOf(multiblock);
     }
 
     /**

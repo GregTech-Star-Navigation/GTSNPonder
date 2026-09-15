@@ -10,6 +10,7 @@ import com.gtsn.ponder.generate.GeneratedKeys;
 import com.gtsn.ponder.generate.GtTierNames;
 import com.gtsn.ponder.generate.MachineDescriptions;
 import com.gtsn.ponder.generate.SceneGenerator;
+import com.gtsn.ponder.generate.SceneVariants;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import org.junit.jupiter.api.Test;
 
@@ -84,6 +85,14 @@ class GeneratedLangKeysTest {
             GeneratedKeys.LEGEND_HATCH,
             GeneratedKeys.LEGEND_MODULE_SLOT);
 
+    /** 变体标签键（工单 #21 反馈 2）：默认 / 短 / 长 / n 节，须经 datagen 产出中英双语。 */
+    private static final List<String> VARIANT_LABEL_KEYS = List.of(
+            SceneVariants.LABEL_DEFAULT,
+            SceneVariants.LABEL_SHORT,
+            SceneVariants.LABEL_LONG,
+            SceneVariants.LABEL_SLICES,
+            SceneVariants.LABEL_NUMBERED);
+
     /** GT 机器界面覆盖层入口（#12）的按钮文案键，须经 datagen 产出中英双语。 */
     private static final List<String> GT_MACHINE_OVERLAY_KEYS = List.of(
             com.gtsn.ponder.catalog.CatalogKeys.GT_MACHINE_OPEN,
@@ -113,6 +122,19 @@ class GeneratedLangKeysTest {
             for (String key : LEGEND_KEYS) {
                 assertTrue(locale.getValue().has(key), locale.getKey() + " is missing legend key " + key);
             }
+        }
+    }
+
+    @Test
+    void bothLocalesCoverVariantLabelKeys() throws IOException {
+        for (Map.Entry<String, JsonObject> locale : Map.of("en_us", read(EN, "en_us"), "zh_cn", read(ZH, "zh_cn"))
+                .entrySet()) {
+            for (String key : VARIANT_LABEL_KEYS) {
+                assertTrue(locale.getValue().has(key), locale.getKey() + " is missing variant key " + key);
+                assertFalse(locale.getValue().get(key).getAsString().isBlank(), key);
+            }
+            assertTrue(locale.getValue().get(SceneVariants.LABEL_SLICES).getAsString().contains("%s"),
+                    "the slice-count template must carry a placeholder");
         }
     }
 

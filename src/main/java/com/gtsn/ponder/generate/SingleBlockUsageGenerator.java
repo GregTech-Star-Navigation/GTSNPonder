@@ -50,7 +50,7 @@ import java.util.Objects;
 public final class SingleBlockUsageGenerator {
 
     /** 生成器版本：产物可重生成 / 可 diff 的标识（写入 {@code generatorVersion}）。 */
-    public static final String GENERATOR_VERSION = "usage-2";
+    public static final String GENERATOR_VERSION = "usage-3";
 
     /** 单方块使用场景 id 前缀（后缀为清洗后的目标 id）；目录 / 进度键与产物 id 共用此推导。 */
     public static final String SCENE_ID_PREFIX = "gtsnponder:usage_";
@@ -76,6 +76,7 @@ public final class SingleBlockUsageGenerator {
     private static final int TEXT_DURATION = 50;
     private static final int SHOW_DURATION = 12;
     private static final int HIGHLIGHT_DURATION = 30;
+    private static final int OUTLINE_DURATION = 24;
 
     /** 取景自适应目标填充比例（视口窄轴的占比）；1×1×1 结构的回退距离下限见 {@link #MIN_CAMERA_DISTANCE}。 */
     public static final double FIT_MARGIN = 0.90d;
@@ -145,6 +146,15 @@ public final class SingleBlockUsageGenerator {
 
         // ② 搭建 / 本体 → ③ 输入 → ④ 输出 → ⑤ 供能 → ⑥ 常见坑 → 进阶（覆盖板）。
         steps.add(setupNarration(source));
+        // 反馈 1（工单 #21）：单方块没有结构可搭，但仍以「金色本体高亮 → 蓝色部件轮廓」两段式给出
+        // 与多方块一致的视觉节奏（轮廓步代表槽 / 罐 / 仓口等内部部件），而不是一帧静止。
+        steps.add(SceneStep.builder()
+                .id("outline.machine")
+                .type(StepType.OUTLINE)
+                .duration(OUTLINE_DURATION)
+                .targets(List.of(ELEMENT_MACHINE))
+                .param("visible", Boolean.TRUE)
+                .build());
         steps.add(inputsNarration(source));
         steps.add(outputsNarration(source));
         steps.add(energyNarration(source));

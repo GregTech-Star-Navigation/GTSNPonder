@@ -75,8 +75,8 @@ public final class SystemsAutotest {
 
     private static final String POWER_LAST_NARRATION = "ponder.gtsnponder.power.narration.burning";
     private static final String LOGISTICS_LAST_NARRATION = "ponder.gtsnponder.logistics.narration.covers";
-    private static final int POWER_STEPS = 9;
-    private static final int LOGISTICS_STEPS = 10;
+    private static final int POWER_STEPS = 11;
+    private static final int LOGISTICS_STEPS = 12;
 
     private static final int WIDTH = 1280;
     private static final int HEIGHT = 720;

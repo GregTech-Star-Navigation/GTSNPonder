@@ -209,9 +209,24 @@ public final class SceneGenerator {
         return source.blockCount() > CELL_BUDGET;
     }
 
-    /** 把结构源确定性生成场景数据。 */
+    /** 把结构源确定性生成场景数据（默认变体）。 */
     public static SceneData generate(StructureSource source) {
+        return generate(source, "default", sceneIdFor(source.id()));
+    }
+
+    /**
+     * 变体感知生成（工单 #21 反馈 2）：与 {@link #generate(StructureSource)} 产出的步骤 / 元素完全一致，
+     * 只把场景 {@code variant} 与 {@code id} 换成给定变体（供 {@link SceneVariants} 为 GT 的多结构页
+     * 生成「短 / 长」「n 节」等变体）。默认路径即委托到此，参数为
+     * {@code ("default", sceneIdFor(source.id()))}。
+     *
+     * @param variantId 写入 {@code variant} 的稳定变体 id；空则回退 {@code default}
+     * @param sceneId   场景稳定 id；空则回退 {@link #sceneIdFor(String)}
+     */
+    public static SceneData generate(StructureSource source, String variantId, String sceneId) {
         Objects.requireNonNull(source, "source must not be null");
+        String variant = variantId == null || variantId.isBlank() ? "default" : variantId;
+        String id = sceneId == null || sceneId.isBlank() ? sceneIdFor(source.id()) : sceneId;
 
         List<SceneElement> elements = new ArrayList<>();
         List<SceneStep> steps = new ArrayList<>();
@@ -244,10 +259,10 @@ public final class SceneGenerator {
 
         return SceneData.builder()
                 .formatVersion(SceneDataParser.CURRENT_FORMAT_VERSION)
-                .id(sceneIdFor(source.id()))
+                .id(id)
                 .title(GeneratedKeys.machineTitleKey(source.id()))
                 .target(source.id())
-                .variant("default")
+                .variant(variant)
                 .source(Source.AUTO)
                 .generatorVersion(GENERATOR_VERSION)
                 .elements(elements)

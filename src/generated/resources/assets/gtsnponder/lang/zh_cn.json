@@ -307,6 +307,11 @@
   "ponder.gtsnponder.usage.lp_steam_furnace.usage": "放入矿石或食物并供应充足的蒸汽：它一次熔炼一个物品，不需要电力线缆。",
   "ponder.gtsnponder.usage.lv_macerator.intro": "这是基础粉碎机——把矿石磨成粉的 LV 主力机器。",
   "ponder.gtsnponder.usage.lv_macerator.usage": "把矿石放进输入槽，通入 LV 电力，再从输出槽取出粉末。",
+  "ponder.gtsnponder.variant.default": "默认",
+  "ponder.gtsnponder.variant.long": "长",
+  "ponder.gtsnponder.variant.numbered": "变体 %s",
+  "ponder.gtsnponder.variant.short": "短",
+  "ponder.gtsnponder.variant.slices": "%s 节",
   "ponder.gtsnponder.xei.open": "打开这台机器的思索教程",
   "ponder.gtsnponder.xei.open.short": "思索"
 }

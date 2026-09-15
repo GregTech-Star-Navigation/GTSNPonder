@@ -16,7 +16,10 @@ import com.gtsn.lib.ui.widget.Stack;
 import com.gtsn.lib.ui.widget.TextMetrics;
 import com.gtsn.lib.ui.widget.TextWidget;
 import com.gtsn.ponder.engine.model.SceneData;
+import com.gtsn.ponder.bridge.BlockInfoResolver;
 import com.gtsn.ponder.generate.GeneratedKeys;
+import com.gtsn.ponder.generate.SceneVariants;
+import com.gtsn.ponder.gt.GtBlockInfo;
 import com.gtsn.ponder.presenter.NarrationLocalization;
 import com.gtsn.ponder.presenter.ScenePlayback;
 import com.gtsn.ponder.structure.StructureSource;
@@ -25,13 +28,16 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.BlockPos;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 鎬濈储鍦烘櫙鎾斁灞忥紙Presenter锛孏TSN UI锛夛細鍦?GTSNLib {@link GtsnScreen} 涓祵鍏?LDLib 3D 瑙嗗彛锛? * 骞跺彔鏀炬梺鐧芥銆佹帶鍒舵潯锛堟殏鍋?/ 涓婁竴姝?/ 涓嬩竴姝?/ 閲嶆挱锛変笌鍙?seek 鐨勮繘搴︽潯銆? *
@@ -84,11 +90,39 @@ public final class ScenePlayerScreen extends GtsnScreen {
     private boolean seeking;
     private int renderedFrames;
 
+    /** 变体选择（工单 #21 反馈 2）：目标 id 与全部变体描述；≤1 时不显示按钮。 */
+    private final String target;
+    private final List<SceneVariants.Spec> variants;
+    private final int variantIndex;
+    private final ButtonWidget variantButton;
+
+    /** 方块名覆盖层（工单 #21 反馈 3）：最近指针位置、按下 / 拖拽标记与当前选中单元。 */
+    private double pointerX = Double.NaN;
+    private double pointerY = Double.NaN;
+    private boolean viewportPress;
+    private boolean viewportDrag;
+    private BlockInfoResolver.BlockInfo selectedBlock;
+    private double selectedAtX;
+    private double selectedAtY;
+
     public ScenePlayerScreen(SceneData scene, StructureSource structure, Level proxyLevel) {
+        this(scene, structure, proxyLevel, null, List.of(), 0);
+    }
+
+    /**
+     * 变体感知构造（工单 #21 反馈 2）：{@code variants} 为同一目标的全部变体描述（按
+     * {@link SceneVariants.Spec} 顺序），{@code variantIndex} 为当前展示的变体下标；>1 时控制条多出
+     * 一个「变体」按钮，点击循环切换到下一个变体（重新打开本屏）。目标无变体时传空列表。
+     */
+    public ScenePlayerScreen(SceneData scene, StructureSource structure, Level proxyLevel,
+            String target, List<SceneVariants.Spec> variants, int variantIndex) {
         super(Component.translatable(scene.title() != null ? scene.title() : DEFAULT_TITLE_KEY),
                 new PanelWidget().fill());
         this.scene = Objects.requireNonNull(scene, "scene must not be null");
         this.structure = Objects.requireNonNull(structure, "structure must not be null");
+        this.target = target;
+        this.variants = List.copyOf(variants == null ? List.of() : variants);
+        this.variantIndex = Math.max(0, Math.min(variantIndex, Math.max(0, this.variants.size() - 1)));
         this.viewport = LdlibSceneViewport.create(proxyLevel, structure);
         this.bridge = new DummySceneWorld(structure, scene, viewport);
         this.playback = ScenePlayback.of(scene, bridge);
@@ -141,6 +175,10 @@ public final class ScenePlayerScreen extends GtsnScreen {
                 this::onNext).fixedSize(48, BUTTON_HEIGHT));
         this.replayButton = controls.add(new ButtonWidget(localized("ponder.gtsnponder.control.replay"), metrics,
                 this::onReplay).fixedSize(64, BUTTON_HEIGHT));
+        this.variantButton = this.variants.size() > 1
+                ? controls.add(new ButtonWidget(variantLabel(), metrics, this::onNextVariant)
+                        .fixedSize(132, BUTTON_HEIGHT))
+                : null;
         controls.add(new SpacerWidget().weight(1));
         controls.add(new TextWidget(localized("ponder.gtsnponder.player.seekhint"), metrics)
                 .colorRole(ThemeColorRole.TEXT_MUTED));
@@ -240,6 +278,29 @@ public final class ScenePlayerScreen extends GtsnScreen {
         syncWidgets();
     }
 
+    /** 「变体」按钮文案：本地化变体标签 + (i/n)（工单 #21 反馈 2）。 */
+    private String variantLabel() {
+        SceneVariants.Spec spec = variants.get(variantIndex);
+        String label = localized(spec.labelKey(), spec.labelArgs());
+        String counter = "(" + (variantIndex + 1) + "/" + variants.size() + ")";
+        return label.isEmpty() ? counter : label + " " + counter;
+    }
+
+    /** 循环切换到下一个变体（重新打开本屏，结构 / 步骤随之更换）。 */
+    private void onNextVariant() {
+        if (target == null || variants.size() <= 1) {
+            return;
+        }
+        PonderEntrypoints.openVariant(target, (variantIndex + 1) % variants.size());
+    }
+
+    @Override
+    public void mouseMoved(double mouseX, double mouseY) {
+        pointerX = mouseX;
+        pointerY = mouseY;
+        super.mouseMoved(mouseX, mouseY);
+    }
+
     private void seekAt(double guiX) {
         Rect bounds = progressBar.bounds();
         if (bounds.width() <= 0) {
@@ -251,10 +312,21 @@ public final class ScenePlayerScreen extends GtsnScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        pointerX = mouseX;
+        pointerY = mouseY;
         if (button == 0 && progressBar.bounds().contains(mouseX, mouseY)) {
             seeking = true;
             seekAt(mouseX);
             return true;
+        }
+        if (button == 0) {
+            if (viewportWidget.bounds().contains(mouseX, mouseY)) {
+                // 视口内按下可能是「点击方块」也可能是「拖拽旋转」，在释放时（未拖拽）才判定。
+                viewportPress = true;
+                viewportDrag = false;
+            } else {
+                clearBlockSelection();
+            }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -264,6 +336,9 @@ public final class ScenePlayerScreen extends GtsnScreen {
         if (seeking && button == 0) {
             seekAt(mouseX);
             return true;
+        }
+        if (button == 0 && viewport.isDragging()) {
+            viewportDrag = true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
@@ -275,7 +350,76 @@ public final class ScenePlayerScreen extends GtsnScreen {
             seekAt(mouseX);
             return true;
         }
+        if (button == 0 && viewportPress) {
+            boolean dragged = viewportDrag;
+            viewportPress = false;
+            viewportDrag = false;
+            if (!dragged) {
+                pickBlockAt(mouseX, mouseY);
+            }
+        }
         return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    /**
+     * 点击方块看名称（工单 #21 反馈 3）：读取视口当前指针下的方块（结构局部坐标 == 虚世界坐标），
+     * 映射为结构单元并解析本地化键。再次点击同一方块 / 点击空处即关闭覆盖层。
+     */
+    private void pickBlockAt(double guiX, double guiY) {
+        Optional<BlockPos> picked = viewport.pickedBlock();
+        if (picked.isEmpty()) {
+            clearBlockSelection();
+            return;
+        }
+        BlockPos pos = picked.get();
+        BlockInfoResolver.BlockInfo info = BlockInfoResolver
+                .blockAt(structure, pos.getX(), pos.getY(), pos.getZ())
+                .flatMap(BlockInfoResolver::resolve)
+                .orElse(null);
+        if (info == null) {
+            clearBlockSelection();
+            return;
+        }
+        if (info.equals(selectedBlock)) {
+            clearBlockSelection();
+            return;
+        }
+        selectedBlock = info;
+        selectedAtX = guiX;
+        selectedAtY = guiY;
+        LOGGER.info("[GTSNPonder] block info: block={} role={} pos={} label='{}'",
+                info.blockId(), info.roleKey(), pos, blockOverlayText().orElse(""));
+    }
+
+    private void clearBlockSelection() {
+        if (selectedBlock != null) {
+            LOGGER.info("[GTSNPonder] block info dismissed (was {})", selectedBlock.blockId());
+        }
+        selectedBlock = null;
+    }
+
+    /** 覆盖层文本：方块名（+ 角色名 + GT 电压等级，若有）。无选中时为空。 */
+    public Optional<String> blockOverlayText() {
+        if (selectedBlock == null) {
+            return Optional.empty();
+        }
+        return Optional.of(composeBlockLabel(selectedBlock));
+    }
+
+    private static String composeBlockLabel(BlockInfoResolver.BlockInfo info) {
+        StringBuilder builder = new StringBuilder(Component.translatable(info.nameKey()).getString());
+        if (info.hasRole()) {
+            builder.append(" · ").append(Component.translatable(info.roleKey()).getString());
+        }
+        GtBlockInfo.tierKeyFor(info.blockId())
+                .map(key -> Component.translatable(key).getString())
+                .ifPresent(tier -> builder.append(" · ").append(tier));
+        return builder.toString();
+    }
+
+    /** 当前选中的结构单元（诊断 / 自动测试）；无选中为空。 */
+    public Optional<BlockInfoResolver.BlockInfo> selectedBlock() {
+        return Optional.ofNullable(selectedBlock);
     }
 
     @Override
@@ -291,8 +435,13 @@ public final class ScenePlayerScreen extends GtsnScreen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         viewport.partialTick(partialTick);
+        // 指针位置作为视口拾取坐标：优先用屏幕记录的指针（mouseMoved / mouseClicked 写入，自动测试可确定
+        // 性注入）；尚未记录时回退渲染参数（真实光标）。
+        viewport.setPointer(Double.isFinite(pointerX) ? pointerX : mouseX,
+                Double.isFinite(pointerY) ? pointerY : mouseY);
         super.render(graphics, mouseX, mouseY, partialTick);
         renderLegend(graphics);
+        renderBlockInfoOverlay(graphics);
         renderedFrames++;
         if (renderedFrames == 1 || renderedFrames % 120 == 0) {
             LOGGER.info("[GTSNPonder] scene player frame={} step={} time={} playing={} visibleBlocks={}",
@@ -338,6 +487,33 @@ public final class ScenePlayerScreen extends GtsnScreen {
             String label, int x, int y, int color) {
         graphics.fill(x, y + 1, x + LEGEND_SWATCH, y + 1 + LEGEND_SWATCH, color);
         graphics.drawString(font, label, x + LEGEND_SWATCH + 4, y, 0xFFFFFFFF, true);
+    }
+
+    /**
+     * 方块名覆盖层（工单 #21 反馈 3）：在点击位置附近绘制一个小面板，显示该方块的本地化名称
+     * （+ 角色 + GT 电压等级）。点击同一方块 / 点击空处即关闭。
+     */
+    private void renderBlockInfoOverlay(GuiGraphics graphics) {
+        if (selectedBlock == null) {
+            return;
+        }
+        Rect bounds = viewportWidget.bounds();
+        if (bounds.width() <= 0 || bounds.height() <= 0) {
+            return;
+        }
+        Font font = Minecraft.getInstance().font;
+        String text = composeBlockLabel(selectedBlock);
+        int pad = 4;
+        int boxWidth = font.width(text) + pad * 2;
+        int boxHeight = font.lineHeight + pad * 2;
+        int x = (int) Math.round(selectedAtX) + 10;
+        int y = (int) Math.round(selectedAtY) - boxHeight - 4;
+        x = Math.max(bounds.x() + 2, Math.min(x, bounds.right() - boxWidth - 2));
+        y = Math.max(bounds.y() + 2, Math.min(y, bounds.bottom() - boxHeight - 2));
+        graphics.fill(x, y, x + boxWidth, y + boxHeight, 0xE0101418);
+        graphics.fill(x, y, x + boxWidth, y + 1, 0xFF8AB4E8);
+        graphics.fill(x, y + boxHeight - 1, x + boxWidth, y + boxHeight, 0xFF8AB4E8);
+        graphics.drawString(font, text, x + pad, y + pad, 0xFFFFFFFF, true);
     }
 
     @Override
@@ -387,6 +563,21 @@ public final class ScenePlayerScreen extends GtsnScreen {
 
     public ButtonWidget replayButton() {
         return replayButton;
+    }
+
+    /** 变体切换按钮；目标无多变体时为 {@code null}（不显示）。 */
+    public ButtonWidget variantButton() {
+        return variantButton;
+    }
+
+    /** 当前目标的全部变体描述（无变体时为空列表）。 */
+    public List<SceneVariants.Spec> variants() {
+        return variants;
+    }
+
+    /** 当前展示的变体下标。 */
+    public int variantIndex() {
+        return variantIndex;
     }
 
     public int renderedFrames() {
