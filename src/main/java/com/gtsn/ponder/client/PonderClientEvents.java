@@ -1,11 +1,14 @@
 package com.gtsn.ponder.client;
 
 import com.gtsn.ponder.GTSNPonder;
+import com.gtsn.ponder.gt.GtMachineScreenAdapter;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.commands.Commands;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
+import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -29,7 +32,10 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
  *       </ul>
  *   </li>
  *   <li>每客户端 tick：推进当前 {@link ScenePlayerScreen}（若存在），并消费快捷键点击
- *       （仅在无界面时打开，避免与已打开界面冲突）。</li>
+ *       （无界面时的注视入口；界面内的悬停入口由 {@link ScreenEvent.KeyPressed.Pre} 处理，见下）。</li>
+ *   <li>{@link ScreenEvent.KeyPressed.Pre}：界面内按思索快捷键（默认 G，工单 #17 缺陷 C）等效于
+ *       「悬停物品入口」——原版仅在无界面时投递 {@code KeyMapping} 点击，故容器屏 / XEI 屏须经本事件
+ *       消费；GT 机器屏由 {@code GtMachineOverlayClientEvents} 处理，此处跳过。</li>
  * </ul>
  *
  * <p>客户端专用类（由 {@code Dist.CLIENT} 订阅保证专职服务端不加载）。</p>
@@ -69,6 +75,28 @@ public final class PonderClientEvents {
                         .then(Commands.argument("target", StringArgumentType.string())
                                 .executes(context -> PonderEntrypoints.exportGeneratedDraft(
                                         StringArgumentType.getString(context, "target")).isPresent() ? 1 : 0))));
+    }
+
+    @SubscribeEvent
+    public static void onScreenKeyPressed(ScreenEvent.KeyPressed.Pre event) {
+        // 工单 #17 缺陷 C：原版仅在「无界面」时投递 KeyMapping 点击（KeyboardHandler 的
+        // `if (this.minecraft.screen == null)` 分支），故在容器屏 / XEI 屏里按默认键不会走
+        // consumeClick() tick 路径。这里经 Forge 官方 ScreenEvent 消费该键，使「物品栏悬停机器 +
+        // 按思索键」开箱可用。GT 机器屏由 GtMachineOverlayClientEvents 处理（它用覆盖层目标），
+        // 故此处跳过 GT 机器屏，避免双重打开。
+        Screen screen = event.getScreen();
+        if (screen == null || !PonderEntrypoints.PONDER_KEY.matches(event.getKeyCode(), event.getScanCode())) {
+            return;
+        }
+        if (GtMachineScreenAdapter.isMachineScreen(screen)) {
+            return;
+        }
+        if (!PonderEntrypoints.isHoverEntryScreen(screen)) {
+            return;
+        }
+        if (PonderEntrypoints.onPonderKeyPressed()) {
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent

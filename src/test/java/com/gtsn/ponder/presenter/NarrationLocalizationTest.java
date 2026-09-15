@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,6 +38,11 @@ class NarrationLocalizationTest {
 
     private static List<NarrationLocalization.Part> resolve(String arg, boolean keysExist) {
         return NarrationLocalization.resolveArg(arg, keysExist ? NarrationLocalizationTest::allKnownKeys : key -> false);
+    }
+
+    /** 自定义键存在性谓词的解析（#17 缺陷 B 用）。 */
+    private static List<NarrationLocalization.Part> resolve(String arg, Predicate<String> keyExists) {
+        return NarrationLocalization.resolveArg(arg, keyExists);
     }
 
     @Test
@@ -120,5 +126,60 @@ class NarrationLocalizationTest {
                     "duplicate role key for " + role.name());
         }
         assertEquals(StructureRole.values().length, keys.size());
+    }
+
+    // --- 工单 #17 缺陷 B：单方块使用场景旁白不得露出原始注册 id（机器名 / 配方类型 / 层级） -----------
+
+    @Test
+    void singleBlockMachineIdResolvesToTheGtBlockNameKey() {
+        // 单方块机器没有 datagen 机器标题键，但有 GT 自身的方块名键 block.<ns>.<path>（#17）。
+        List<NarrationLocalization.Part> parts = resolve("gtceu:lv_centrifuge",
+                key -> key.equals(GeneratedKeys.blockNameKey("gtceu:lv_centrifuge")));
+
+        assertEquals(List.of(NarrationLocalization.Part.key(GeneratedKeys.blockNameKey("gtceu:lv_centrifuge"))),
+                parts, "a single-block machine id must resolve to GT's block name key");
+    }
+
+    @Test
+    void recipeTypeIdResolvesToTheGtRecipeTypeNameKey() {
+        // GT 配方类型名的语言键是 <ns>.<path>（如 gtceu.centrifuge -> 离心机 / Centrifuge）。
+        List<NarrationLocalization.Part> parts = resolve("gtceu:centrifuge",
+                key -> key.equals(GeneratedKeys.recipeTypeKey("gtceu:centrifuge")));
+
+        assertEquals(List.of(NarrationLocalization.Part.key(GeneratedKeys.recipeTypeKey("gtceu:centrifuge"))),
+                parts, "a recipe type id must resolve to GT's recipe type name key");
+    }
+
+    @Test
+    void multiblockMachineTitleKeyTakesPrecedenceOverTheBlockNameKey() {
+        Predicate<String> exists = key -> key.equals(GeneratedKeys.machineTitleKey("gtceu:coke_oven"))
+                || key.equals(GeneratedKeys.blockNameKey("gtceu:coke_oven"));
+
+        List<NarrationLocalization.Part> parts = resolve("gtceu:coke_oven", exists);
+
+        assertEquals(List.of(NarrationLocalization.Part.key(GeneratedKeys.machineTitleKey("gtceu:coke_oven"))),
+                parts, "the datagen machine title key must win over the raw GT block name key");
+    }
+
+    @Test
+    void tierCodeResolvesToTheLocalizedTierNameKey() {
+        List<NarrationLocalization.Part> parts = resolve("LV",
+                key -> key.equals(GeneratedKeys.tierKey("LV")));
+
+        assertEquals(List.of(NarrationLocalization.Part.key(GeneratedKeys.tierKey("LV"))),
+                parts, "a bare GT tier code must resolve to the localized tier name key");
+    }
+
+    @Test
+    void unknownTierCodeFallsBackToTheLiteral() {
+        assertEquals(List.of(NarrationLocalization.Part.literal("T99")),
+                resolve("T99", key -> true),
+                "an unknown tier code must not fabricate a key");
+    }
+
+    @Test
+    void idWithoutAnyKnownKeyStillFallsBackToTheRawLiteral() {
+        assertEquals(List.of(NarrationLocalization.Part.literal("gtceu:totally_unknown")),
+                resolve("gtceu:totally_unknown", key -> false));
     }
 }

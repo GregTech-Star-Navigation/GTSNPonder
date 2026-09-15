@@ -6,6 +6,7 @@ import com.gtsn.ponder.catalog.SingleBlockScenes;
 import com.gtsn.ponder.content.SystemSceneKeys;
 import com.gtsn.ponder.editor.EditorKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
+import com.gtsn.ponder.generate.GtTierNames;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import com.gtsn.ponder.gt.GtMultiblockCatalog;
@@ -105,11 +106,13 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.message.no_world", "Join a world before opening ponder.");
         keys.put("ponder.gtsnponder.message.dump", "Generated scene written to %s");
         keys.put("ponder.gtsnponder.message.dump_failed", "Could not write the generated scene: %s");
+        keys.put(CatalogKeys.MACHINE_ITEM_TOOLTIP, "[%s] Ponder");
         editorKeys(keys, false);
         catalogKeys(keys, false);
         systemSceneKeys(keys, false);
         usageSceneKeys(keys, false);
         roleKeys(keys, false);
+        tierKeys(keys, false);
         return keys;
     }
 
@@ -159,11 +162,13 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put("ponder.gtsnponder.message.no_world", "请先进入世界再打开思索。");
         keys.put("ponder.gtsnponder.message.dump", "已把生成场景写入 %s");
         keys.put("ponder.gtsnponder.message.dump_failed", "写入生成场景失败：%s");
+        keys.put(CatalogKeys.MACHINE_ITEM_TOOLTIP, "[%s] 思索");
         editorKeys(keys, true);
         catalogKeys(keys, true);
         systemSceneKeys(keys, true);
         usageSceneKeys(keys, true);
         roleKeys(keys, true);
+        tierKeys(keys, true);
         return keys;
     }
 
@@ -306,7 +311,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
     private static void usageSceneKeys(Map<String, String> keys, boolean chinese) {
         if (chinese) {
             keys.put(SingleBlockUsageGenerator.NARRATION_INTRO,
-                    "这是 %s(%s 级机器)，配方类型：%s。下面讲解如何使用它。");
+                    "这是 %s(%s)，配方类型：%s。下面讲解如何使用它。");
             keys.put(SingleBlockUsageGenerator.NARRATION_MACHINE,
                     "%s 本身就是整台机器——所有部件都在这一个方块里。");
             keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS,
@@ -318,7 +323,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
             keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
                     "这台机器没有物品 / 流体输出(%s 个物品槽、%s 个流体罐)。");
             keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY,
-                    "能量：它使用 %s 级电压。接上匹配的线缆或发电机即可供电。");
+                    "能量：它的电压等级是 %s。接上匹配的线缆或发电机即可供电。");
             keys.put(SingleBlockUsageGenerator.NARRATION_PROGRESS,
                     "配方运行时进度条会填充；若停滞，说明在等待原料或电力。");
             keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
@@ -336,7 +341,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
             return;
         }
         keys.put(SingleBlockUsageGenerator.NARRATION_INTRO,
-                "This is %s (a %s machine). Recipe types: %s. Here is how to use it.");
+                "This is %s (%s). Recipe types: %s. Here is how to use it.");
         keys.put(SingleBlockUsageGenerator.NARRATION_MACHINE,
                 "%s is the machine itself - the whole machine fits in this one block.");
         keys.put(SingleBlockUsageGenerator.NARRATION_INPUTS,
@@ -349,7 +354,7 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         keys.put(SingleBlockUsageGenerator.NARRATION_OUTPUTS_NONE,
                 "This machine produces no item or fluid outputs (%s item slot(s), %s fluid tank(s)).");
         keys.put(SingleBlockUsageGenerator.NARRATION_ENERGY,
-                "Energy: it runs on %s power. Connect a matching cable or generator.");
+                "Energy: its voltage tier is %s. Connect a matching cable or generator.");
         keys.put(SingleBlockUsageGenerator.NARRATION_PROGRESS,
                 "While a recipe runs the progress bar fills; if it stalls it is waiting for inputs or power.");
         keys.put(SingleBlockUsageGenerator.NARRATION_COVERS,
@@ -377,6 +382,17 @@ public final class GtsnPonderLanguageProvider extends LanguageProvider {
         for (StructureRole role : StructureRole.values()) {
             String key = GeneratedKeys.roleKey(role.name());
             keys.put(key, chinese ? roleNameZh(role) : roleNameEn(role));
+        }
+    }
+
+    /**
+     * GT 电压层级名（工单 #17 缺陷 B）：单方块使用场景旁白原本露出层级短码（{@code OpV} / {@code LV}），
+     * 本方法为 {@link GtTierNames} 的每个层级产出中英键（{@link GeneratedKeys#tierKey(String)}），
+     * 播放屏经 {@code NarrationLocalization} 解析。
+     */
+    private static void tierKeys(Map<String, String> keys, boolean chinese) {
+        for (GtTierNames.Tier tier : GtTierNames.ALL) {
+            keys.put(GeneratedKeys.tierKey(tier.code()), chinese ? tier.zh() : tier.en());
         }
     }
 

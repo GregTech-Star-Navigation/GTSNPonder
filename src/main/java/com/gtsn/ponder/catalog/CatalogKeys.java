@@ -46,6 +46,9 @@ public final class CatalogKeys {
     /** GT 机器界面覆盖层「思索」按钮的短标签（按钮文字）。 */
     public static final String GT_MACHINE_OPEN_SHORT = "ponder.gtsnponder.gt.open.short";
 
+    /** GT 机器物品 tooltip 的「思索」入口提示（工单 #17，参数：当前绑定键）。 */
+    public static final String MACHINE_ITEM_TOOLTIP = "ponder.gtsnponder.tooltip.ponder";
+
     /** 类别显示名键前缀（{@code ...category.<key>}）。 */
     public static final String CATEGORY_PREFIX = "ponder.gtsnponder.catalog.category.";
 

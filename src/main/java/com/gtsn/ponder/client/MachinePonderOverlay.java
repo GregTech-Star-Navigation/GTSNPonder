@@ -15,6 +15,11 @@ import java.util.Optional;
 public final class MachinePonderOverlay {
 
     private static final MachinePonderOverlay INSTANCE = new MachinePonderOverlay();
+    /**
+     * XEI（JEI/EMI）普通页面覆盖层的独立实例（工单 #17 缺陷 A）：GT 机器屏覆盖层与 XEI 页覆盖层可能
+     * 在同一帧被不同渲染处理器分别 present / clear，共用单例会互相清空，故各自持有状态。
+     */
+    private static final MachinePonderOverlay XEI_INSTANCE = new MachinePonderOverlay();
 
     private String target;
     private MachinePonderButton.Box box;
@@ -26,6 +31,11 @@ public final class MachinePonderOverlay {
 
     public static MachinePonderOverlay get() {
         return INSTANCE;
+    }
+
+    /** XEI（JEI/EMI）普通页面覆盖层的独立实例（工单 #17 缺陷 A）；语义与 {@link #get()} 相同。 */
+    public static MachinePonderOverlay xei() {
+        return XEI_INSTANCE;
     }
 
     /**

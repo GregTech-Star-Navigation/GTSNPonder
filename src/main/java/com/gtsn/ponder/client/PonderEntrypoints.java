@@ -54,9 +54,13 @@ import java.util.Optional;
  */
 public final class PonderEntrypoints {
 
-    /** 思索快捷键（默认 P；冲突时玩家可自行改绑）。 */
+    /**
+     * 思索快捷键（默认 <b>G</b>，工单 #17 缺陷 C：必须有默认绑定，否则「物品栏悬停机器 + 按键」开箱不可用；
+     * 冲突时玩家可在「控制」里改绑）。在界面内由 {@code PonderClientEvents} 经
+     * {@code ScreenEvent.KeyPressed.Pre} 消费（原版仅在无界面时投递 {@code KeyMapping} 点击）。
+     */
     public static final KeyMapping PONDER_KEY = new KeyMapping(
-            "key.gtsnponder.ponder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
+            "key.gtsnponder.ponder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G,
             "key.categories.gtsnponder");
 
     /** 思索图鉴目录快捷键（默认 O；冲突时玩家可自行改绑）。 */

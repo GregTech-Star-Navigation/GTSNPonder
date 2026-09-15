@@ -22,6 +22,12 @@ public final class GeneratedKeys {
      */
     public static final String ROLE_PREFIX = "ponder.gtsnponder.generated.role.";
 
+    /**
+     * GT 电压层级名语言键前缀（工单 #17 缺陷 B）：完整键 = 前缀 + <b>小写的层级短码</b>，
+     * 例如 {@code OpV} → {@code ponder.gtsnponder.tier.opv}。层级短码表见 {@link GtTierNames}。
+     */
+    public static final String TIER_PREFIX = "ponder.gtsnponder.tier.";
+
     /** 常驻颜色图例的本地化键。 */
     public static final String LEGEND_TITLE = "ponder.gtsnponder.legend.title";
     public static final String LEGEND_CONTROLLER = "ponder.gtsnponder.legend.controller";
@@ -46,6 +52,38 @@ public final class GeneratedKeys {
     public static String roleKey(String roleName) {
         return ROLE_PREFIX + roleName;
     }
+
+    /**
+     * GT 电压层级名语言键（工单 #17 缺陷 B）：{@code tierKey("OpV")} →
+     * {@code ponder.gtsnponder.tier.opv}。
+     */
+    public static String tierKey(String tierCode) {
+        return TIER_PREFIX + tierCode.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * GT 方块名语言键（工单 #17 缺陷 B）：把 {@code gtceu:lv_centrifuge} 映射为 GT 自身的方块名键
+     * {@code block.gtceu.lv_centrifuge}。单方块机器没有 datagen 机器标题键，但其方块名键由 GT 随包
+     * lang 提供（中英双语），故单方块旁白经此键本地化。
+     */
+    public static String blockNameKey(String targetId) {
+        int colon = targetId.indexOf(':');
+        String namespace = colon > 0 ? targetId.substring(0, colon) : "minecraft";
+        String path = colon >= 0 ? targetId.substring(colon + 1) : targetId;
+        return "block." + namespace + "." + path;
+    }
+
+    /**
+     * GT 配方类型名语言键（工单 #17 缺陷 B）：把 {@code gtceu:centrifuge} 映射为 GT 随包 lang 的
+     * {@code gtceu.centrifuge}（中英双语：离心机 / Centrifuge）。
+     */
+    public static String recipeTypeKey(String targetId) {
+        int colon = targetId.indexOf(':');
+        String namespace = colon > 0 ? targetId.substring(0, colon) : "minecraft";
+        String path = colon >= 0 ? targetId.substring(colon + 1) : targetId;
+        return namespace + "." + path;
+    }
+
 
     /** 结构 id → 稳定键片段：小写，非 {@code [a-z0-9_]} 的字符替换为 {@code _}。 */
     public static String sanitize(String id) {

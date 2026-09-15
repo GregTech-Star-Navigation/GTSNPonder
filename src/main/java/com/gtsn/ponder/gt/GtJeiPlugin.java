@@ -3,6 +3,7 @@ package com.gtsn.ponder.gt;
 import com.gregtechceu.gtceu.integration.jei.multipage.MultiblockInfoCategory;
 
 import com.gtsn.ponder.client.PonderXeiItemHover;
+import com.gtsn.ponder.client.PonderXeiPageTargets;
 import com.mojang.blaze3d.platform.Window;
 
 import mezz.jei.api.IModPlugin;
@@ -39,6 +40,9 @@ public final class GtJeiPlugin implements IModPlugin {
     /** 稳定的来源引用（注册 / 注销同一实例）。 */
     private static final PonderXeiItemHover.Source HOVER_SOURCE = GtJeiPlugin::hoveredItemId;
 
+    /** 稳定的「JEI 普通配方页」目标来源引用（工单 #17 缺陷 A）。 */
+    private static final GtJeiXeiPageTargets PAGE_TARGETS = new GtJeiXeiPageTargets();
+
     private static IJeiRuntime runtime;
 
     @Override
@@ -57,12 +61,14 @@ public final class GtJeiPlugin implements IModPlugin {
     public void onRuntimeAvailable(IJeiRuntime jeiRuntime) {
         runtime = jeiRuntime;
         PonderXeiItemHover.get().register(HOVER_SOURCE);
+        PonderXeiPageTargets.get().register(PAGE_TARGETS);
     }
 
     @Override
     public void onRuntimeUnavailable() {
         runtime = null;
         PonderXeiItemHover.get().unregister(HOVER_SOURCE);
+        PonderXeiPageTargets.get().unregister(PAGE_TARGETS);
     }
 
     /**

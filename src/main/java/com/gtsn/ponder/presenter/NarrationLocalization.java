@@ -1,6 +1,7 @@
 package com.gtsn.ponder.presenter;
 
 import com.gtsn.ponder.generate.GeneratedKeys;
+import com.gtsn.ponder.generate.GtTierNames;
 import com.gtsn.ponder.structure.StructureRole;
 
 import java.util.ArrayList;
@@ -17,10 +18,14 @@ import java.util.function.Predicate;
  * 「可翻译键 / 字面量」片段：</p>
  *
  * <ol>
- *   <li>注册 id 形态（含 {@code :}）→ 机器标题键 {@link GeneratedKeys#machineTitleKey(String)}；
- *       键不存在时回退原始 id（「没有标题键的机器照常工作」）；</li>
+ *   <li>注册 id 形态（含 {@code :}）→ 依次尝试：datagen 机器标题键 {@link GeneratedKeys#machineTitleKey(String)}
+ *       （多方块）、GT 方块名键 {@link GeneratedKeys#blockNameKey(String)}（单方块机器，工单 #17）、
+ *       GT 配方类型名键 {@link GeneratedKeys#recipeTypeKey(String)}（{@code gtceu.centrifuge}，工单 #17）；
+ *       键都不存在时回退原始 id（「没有标题键的机器照常工作」）；</li>
  *   <li>{@link StructureRole} 枚举名 → 角色语言键 {@link GeneratedKeys#roleKey(String)}；键不存在时
  *       回退枚举名；</li>
+ *   <li>裸 GT 层级短码（{@code OpV} / {@code LV}，工单 #17）→ 本地化层级名键
+ *       {@link GeneratedKeys#tierKey(String)}（表见 {@link GtTierNames}）；未知短码保持字面量；</li>
  *   <li>其余（尺寸 {@code 3x3x3}、坐标、{@code —} 占位等）原样保留。</li>
  * </ol>
  *
@@ -88,8 +93,23 @@ public final class NarrationLocalization {
             return keyExists.test(roleKey) ? Part.key(roleKey) : Part.literal(token);
         }
         if (token.indexOf(':') >= 0) {
-            String titleKey = GeneratedKeys.machineTitleKey(token);
-            return keyExists.test(titleKey) ? Part.key(titleKey) : Part.literal(token);
+            // 注册 id 形态（含 ':'）：按优先级尝试候选语言键——① datagen 机器标题键（多方块）；
+            // ② GT 方块名键 block.<ns>.<path>（单方块机器，工单 #17）；③ GT 配方类型名键
+            // <ns>.<path>（如 gtceu.centrifuge，工单 #17）。键存在即用，否则回退原始 id。
+            for (String candidate : List.of(
+                    GeneratedKeys.machineTitleKey(token),
+                    GeneratedKeys.blockNameKey(token),
+                    GeneratedKeys.recipeTypeKey(token))) {
+                if (keyExists.test(candidate)) {
+                    return Part.key(candidate);
+                }
+            }
+            return Part.literal(token);
+        }
+        // 裸层级短码（OpV / LV 等，工单 #17）：映射到本地化层级名键；未知短码保持字面量。
+        java.util.Optional<String> tierKey = GtTierNames.keyFor(token);
+        if (tierKey.isPresent() && keyExists.test(tierKey.get())) {
+            return Part.key(tierKey.get());
         }
         return Part.literal(token);
     }

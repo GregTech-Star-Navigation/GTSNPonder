@@ -458,6 +458,27 @@ public final class GtStructureGameTests {
         helper.succeed();
     }
 
+    /**
+     * 工单 #17 缺陷 A 的适配层守卫（真实注册表）：GT 机器物品（多方块控制器 / 单方块机器）解析思索目标，
+     * 非机器物品（原版方块、GT 材料 / 配方类型名）<b>不</b>解析——覆盖层据此决定绘制 / 不绘制。
+     */
+    @GameTest(template = "empty")
+    public static void machineItemTargetsResolveAndNonMachinesDoNot(GameTestHelper helper) {
+        for (String machine : List.of("gtceu:coke_oven", "gtceu:lv_macerator", "gtceu:lp_steam_furnace")) {
+            if (GtMachineItemTarget.targetForItem(machine).isEmpty()) {
+                helper.fail("GT machine item did not resolve to a ponder target: " + machine);
+                return;
+            }
+        }
+        for (String nonMachine : List.of("minecraft:stone", "gtceu:iron_ingot", "gtceu:macerator", "")) {
+            if (GtMachineItemTarget.targetForItem(nonMachine).isPresent()) {
+                helper.fail("non-machine id resolved to a ponder target: " + nonMachine);
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
     /** 取焦炉定义用于承载控制器方块（其方块是带 MultiblockMachineDefinition 的 MetaMachineBlock）。 */
     private static MultiblockMachineDefinition controllerDefinition() {
         MachineDefinition definition = GTRegistries.MACHINES.get(ResourceLocation.tryParse("gtceu:coke_oven"));

@@ -89,10 +89,7 @@ public final class SingleBlockUsageGenerator {
      */
     public static String titleKeyFor(String targetId) {
         Objects.requireNonNull(targetId, "targetId");
-        int colon = targetId.indexOf(':');
-        String namespace = colon > 0 ? targetId.substring(0, colon) : "minecraft";
-        String path = colon >= 0 ? targetId.substring(colon + 1) : targetId;
-        return "block." + namespace + "." + path;
+        return GeneratedKeys.blockNameKey(targetId);
     }
 
     /**

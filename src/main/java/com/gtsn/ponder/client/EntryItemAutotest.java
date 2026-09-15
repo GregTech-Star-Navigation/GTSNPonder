@@ -1,11 +1,15 @@
 package com.gtsn.ponder.client;
 
 import com.gtsn.ponder.GTSNPonder;
+import com.gtsn.ponder.engine.model.SceneStep;
 import com.gtsn.ponder.generate.GeneratedKeys;
+import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
+import com.gtsn.ponder.presenter.NarrationLocalization;
 import com.gtsn.ponder.structure.StructureRole;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -27,6 +31,8 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -34,6 +40,7 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -45,7 +52,9 @@ import java.util.Optional;
  * <p>环境变量 {@code GTSNPONDER_UI_AUTOTEST=entryitem} 启用。流程：</p>
  * <ol>
  *   <li>标题界面：固定窗口 1280x720 + GUI 缩放 2，创建 / 载入固定存档；</li>
- *   <li>把 {@code gtceu:lp_steam_furnace} 物品放进玩家背包首格；打开背包屏；把光标移到该格上；</li>
+ *   <li>把 {@code gtceu:lp_steam_furnace} 物品放进玩家背包首格；打开背包屏；把光标<b>确定性</b>地点到该格上
+ *       （GLFW 真实光标 + 反射写 {@link MouseHandler} 的 {@code xpos}/{@code ypos}，消除无头运行下
+ *       光标停在屏幕中心导致的 hoveredSlot 竞态）；</li>
  *   <li>调用思索快捷键的统一入口 {@link PonderEntrypoints#onPonderKeyPressed()}（与游戏内按键同路径），
  *       断言解析出该物品 id 且打开了对应播放屏（缺陷 C）；截图为证；</li>
  *   <li>切换到一台<b>带仓口</b>的多方块（{@code gtceu:large_combustion_engine}）的自动生成场景，seek 到
@@ -70,10 +79,16 @@ public final class EntryItemAutotest {
     private static final String HOVER_TARGET = "gtceu:lp_steam_furnace";
     /** 旁白本地化目标：带仓口 / 总线的大型多方块（强制自动生成，故旁白含机器名与角色名）。 */
     private static final String NARRATION_TARGET = "gtceu:large_combustion_engine";
+    /** 单方块使用场景旁白本地化目标（工单 #17 缺陷 B）：机器名 / 层级 / 配方类型均须本地化。 */
+    private static final String SINGLE_BLOCK_TARGET = "gtceu:lv_centrifuge";
 
     private static final String HOVER_SCREENSHOT = "gtsnponder-entryitem-hover.png";
+    /** 按键<b>之前</b>的背包截图：证明默认键触发时光标确实悬停在目标槽位上（缺陷 C 的直接证据）。 */
+    private static final String HOVER_SLOT_SCREENSHOT = "gtsnponder-entryitem-hover-slot.png";
     private static final String NARRATION_ZH_SCREENSHOT = "gtsnponder-entryitem-narration-zh.png";
     private static final String NARRATION_EN_SCREENSHOT = "gtsnponder-entryitem-narration-en.png";
+    private static final String USAGE_ZH_SCREENSHOT = "gtsnponder-entryitem-usage-zh.png";
+    private static final String USAGE_EN_SCREENSHOT = "gtsnponder-entryitem-usage-en.png";
     private static final String CATALOG_SCREENSHOT = "gtsnponder-entryitem-catalog.png";
     private static final String FAILED_SCREENSHOT = "gtsnponder-entryitem-failed.png";
 
@@ -98,8 +113,8 @@ public final class EntryItemAutotest {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private enum Stage {
-        TITLE, WORLD, HOVER, PLAYER, NARRATION_ZH, CAPTURE_ZH, CATALOG, RELOAD_EN, NARRATION_EN,
-        CAPTURE_EN, GRAB, DONE, FAILED
+        TITLE, WORLD, HOVER, PLAYER, NARRATION_ZH, CAPTURE_ZH, USAGE_ZH, CAPTURE_USAGE_ZH, CATALOG,
+        RELOAD_EN, NARRATION_EN, CAPTURE_EN, USAGE_EN, CAPTURE_USAGE_EN, GRAB, DONE, FAILED
     }
 
     private static Stage stage = Stage.TITLE;
@@ -112,6 +127,12 @@ public final class EntryItemAutotest {
     private static int nextOpenRequestTick;
     /** 当前尝试的候选槽位下标（EMI/JEI 面板可能覆盖某个槽位时回退到下一个）。 */
     private static int candidateIndex;
+    /** 实际用于投递 KeyPressed 的按键值（默认绑定，诊断 / PASS 证据用；避免被后续资源重载改写）。 */
+    private static int postedKeyCode = -1;
+    /** {@link MouseHandler} 的坐标字段（官方名，SRG 回退）；见 {@link #setMousePosition}。 */
+    private static Field mouseXField;
+    private static Field mouseYField;
+    private static boolean mouseFieldsResolved;
 
     private EntryItemAutotest() {
     }
@@ -133,10 +154,14 @@ public final class EntryItemAutotest {
             case PLAYER -> tickPlayer(minecraft);
             case NARRATION_ZH -> tickNarrationZh(minecraft);
             case CAPTURE_ZH -> tickCaptureZh(minecraft);
+            case USAGE_ZH -> tickUsageZh(minecraft);
+            case CAPTURE_USAGE_ZH -> tickCaptureUsageZh(minecraft);
             case CATALOG -> tickCatalog(minecraft);
             case RELOAD_EN -> tickReloadEn(minecraft);
             case NARRATION_EN -> tickNarrationEn(minecraft);
             case CAPTURE_EN -> tickCaptureEn(minecraft);
+            case USAGE_EN -> tickUsageEn(minecraft);
+            case CAPTURE_USAGE_EN -> tickCaptureUsageEn(minecraft);
             case GRAB -> tickGrab(minecraft);
             case DONE, FAILED -> tickStop(minecraft);
         }
@@ -148,6 +173,7 @@ public final class EntryItemAutotest {
             return;
         }
         prepareWindow(minecraft);
+        resetPonderKeybindingsToDefault();
         loadOrCreateWorld(minecraft);
         LOGGER.info("[GTSNPonder] entryitem autotest: {}={} -> loading world '{}'",
                 AUTOTEST_ENV, MODE, LEVEL_NAME);
@@ -223,24 +249,33 @@ public final class EntryItemAutotest {
             return;
         }
         Slot slot = candidates.get(candidateIndex);
-        // AbstractContainerScreen.hoveredSlot 由 render() 依真实鼠标坐标计算；screen.mouseMoved() 不会更新
-        // 它（历史失败的根因）。故移动真实光标，并在有界窗口内等待其落到该槽位。
-        moveCursorToSlot(minecraft, screen, slot);
+        // AbstractContainerScreen.hoveredSlot 由 render() 依 GameRenderer 从 MouseHandler.xpos/ypos 反算的
+        // 坐标计算，screen.mouseMoved() 不会更新它（历史失败根因）。GLFW 光标 warp 在窗口失焦的无头
+        // 运行下会静默失效（实测 cursor 恒为 (640,360) 屏幕中心 → hoveredSlot 恒为创造栏某槽），故这里
+        // 额外用反射把坐标写进 MouseHandler（渲染实际读取的坐标），并在有界窗口内等待其落到该槽位。
+        boolean mouseSet = pointAtSlot(minecraft, screen, slot);
         Slot under = screen.getSlotUnderMouse();
         if (under != slot) {
             if (ticks > OPEN_TIMEOUT_TICKS + HOVER_TIMEOUT_TICKS) {
                 fail(minecraft, "cursor never hovered the " + HOVER_TARGET + " slot: hovered="
-                        + describeSlot(under) + ", expected=" + describeSlot(slot) + ", cursor=("
-                        + (int) minecraft.mouseHandler.xpos() + "," + (int) minecraft.mouseHandler.ypos()
-                        + "), slotGui=(" + (screen.getGuiLeft() + slot.x + 8) + ","
-                        + (screen.getGuiTop() + slot.y + 8) + ")");
+                        + describeSlot(under) + ", expected=" + describeSlot(slot) + ", mouseSet=" + mouseSet
+                        + ", cursor=(" + (int) minecraft.mouseHandler.xpos() + ","
+                        + (int) minecraft.mouseHandler.ypos() + "), slotGui=("
+                        + (screen.getGuiLeft() + slot.x + 8) + "," + (screen.getGuiTop() + slot.y + 8) + ")");
             }
             return;
         }
         Optional<String> hovered = PonderEntrypoints.hoveredItemId();
+        if (!HOVER_TARGET.equals(hovered.orElse(null))) {
+            // XEI（JEI/EMI）悬停来源可能按<b>真实物理光标</b>（无头下可能与模拟坐标不一致）先返回别的
+            // 物品；本测试锁定的是原版容器槽悬停路径，故清掉 XEI 悬停来源后用同一生产入口重查
+            // （槽位命中即通过）。XEI 悬停集成已由 xeipage 测试覆盖。
+            PonderXeiItemHover.get().reset();
+            hovered = PonderEntrypoints.hoveredItemId();
+        }
         hoveredId = hovered.orElse(null);
         if (!HOVER_TARGET.equals(hoveredId)) {
-            // XEI（JEI/EMI）面板可能覆盖该槽位并先返回自己的物品；换下一个候选槽位重试（仍失败可检出）。
+            // 仍不一致：换下一个候选槽位重试（仍失败可检出）。
             candidateIndex++;
             if (candidateIndex >= candidates.size()) {
                 fail(minecraft, "hovered item id was " + hoveredId + ", expected " + HOVER_TARGET
@@ -249,11 +284,25 @@ public final class EntryItemAutotest {
             }
             return;
         }
-        LOGGER.info("[GTSNPonder] entryitem autotest: item under cursor = {} (slot={}, XEI source(s)={})",
-                hoveredId, describeSlot(slot), PonderXeiItemHover.get().sourceCount());
-        // 与游戏内快捷键同路径：有界面时按「悬停物品」入口。
-        if (!PonderEntrypoints.onPonderKeyPressed()) {
-            fail(minecraft, "pressing the ponder key on a hovered item did not open a scene");
+        LOGGER.info("[GTSNPonder] entryitem autotest: item under cursor = {} (slot={}, mouseSet={}, "
+                + "XEI source(s)={})", hoveredId, describeSlot(slot), mouseSet,
+                PonderXeiItemHover.get().sourceCount());
+        // 与游戏内快捷键同路径：在容器屏内投递真实的 ScreenEvent.KeyPressed.Pre（原版仅在无界面时投递
+        // KeyMapping 点击，工单 #17 缺陷 C 的实机证明）。断言默认绑定已绑定且事件被消费。
+        if (PonderEntrypoints.PONDER_KEY.isUnbound()) {
+            fail(minecraft, "the ponder key is unbound by default - the item-hover entry cannot fire");
+            return;
+        }
+        int keyCode = PonderEntrypoints.PONDER_KEY.getKey().getValue();
+        postedKeyCode = keyCode;
+        // 按键前截图：光标悬停在目标槽位上的背包画面（缺陷 C 的直接证据）。
+        grabScreenshot(minecraft, HOVER_SLOT_SCREENSHOT);
+        boolean canceled = MinecraftForge.EVENT_BUS.post(new ScreenEvent.KeyPressed.Pre(screen, keyCode, 0, 0));
+        LOGGER.info("[GTSNPonder] entryitem autotest: posted KeyPressed.Pre (key={}) on the inventory screen, "
+                + "canceled={}", keyCode, canceled);
+        if (!canceled) {
+            fail(minecraft, "pressing the default ponder key on a hovered item did not open a scene "
+                    + "(event not consumed)");
             return;
         }
         stage = Stage.PLAYER;
@@ -270,15 +319,58 @@ public final class EntryItemAutotest {
     }
 
     /**
-     * 把<b>真实光标</b>移到槽位中心（GUI 坐标 × GUI 缩放 = 窗口像素坐标）。{@code hoveredSlot} 由
-     * {@code render()} 依真实鼠标坐标计算，故这是让槽位真正「被悬停」的唯一途径。
+     * 把光标<b>确定性</b>地点到槽位中心：既调 GLFW 真实光标（截图 / XEI 悬停可见），也反射写入
+     * {@link MouseHandler} 的 {@code xpos}/{@code ypos}（{@code GameRenderer} 渲染时实际读取、再经
+     * GUI 缩放反算给 {@code AbstractContainerScreen.render} 的坐标）。
+     *
+     * <p>{@code GLFW.glfwSetCursorPos} 在窗口失焦的无头运行下会静默失效（历史失败：光标恒为
+     * {@code (640,360)} 屏幕中心 → {@code hoveredSlot} 恒为创造栏某槽），故反射写坐标是消除该竞态的
+     * 关键；确认槽位真正被悬停后按默认键，即完成缺陷 C 的实机证明。返回反射是否可用（诊断用）。</p>
      */
-    private static void moveCursorToSlot(Minecraft minecraft, AbstractContainerScreen<?> screen, Slot slot) {
+    private static boolean pointAtSlot(Minecraft minecraft, AbstractContainerScreen<?> screen, Slot slot) {
         Window window = minecraft.getWindow();
-        double scale = window.getGuiScale();
+        int guiWidth = window.getGuiScaledWidth();
+        int guiHeight = window.getGuiScaledHeight();
         double guiX = screen.getGuiLeft() + slot.x + 8.0d;
         double guiY = screen.getGuiTop() + slot.y + 8.0d;
-        GLFW.glfwSetCursorPos(window.getWindow(), guiX * scale, guiY * scale);
+        // GameRenderer 反算的逆：窗口像素 = GUI 坐标 × 窗口像素 / GUI 缩放后尺寸。
+        double windowX = guiWidth <= 0 ? guiX : guiX * window.getScreenWidth() / (double) guiWidth;
+        double windowY = guiHeight <= 0 ? guiY : guiY * window.getScreenHeight() / (double) guiHeight;
+        GLFW.glfwSetCursorPos(window.getWindow(), windowX, windowY);
+        return setMousePosition(minecraft.mouseHandler, windowX, windowY);
+    }
+
+    /** 反射写入 {@link MouseHandler} 的 {@code xpos}/{@code ypos}；字段不可用时返回 {@code false}。 */
+    private static boolean setMousePosition(MouseHandler handler, double x, double y) {
+        if (!mouseFieldsResolved) {
+            mouseFieldsResolved = true;
+            mouseXField = resolveField("xpos", "f_91507_");
+            mouseYField = resolveField("ypos", "f_91508_");
+        }
+        if (mouseXField == null || mouseYField == null) {
+            return false;
+        }
+        try {
+            mouseXField.setDouble(handler, x);
+            mouseYField.setDouble(handler, y);
+            return true;
+        } catch (IllegalAccessException | IllegalArgumentException failure) {
+            return false;
+        }
+    }
+
+    /** 按候选名（官方映射名 → SRG 名）解析字段；都找不到返回 {@code null}（回退 GLFW 光标）。 */
+    private static Field resolveField(String officialName, String srgName) {
+        for (String name : new String[] {officialName, srgName}) {
+            try {
+                Field field = MouseHandler.class.getDeclaredField(name);
+                field.setAccessible(true);
+                return field;
+            } catch (NoSuchFieldException | RuntimeException ignored) {
+                // 尝试下一个候选名（dev / 生产映射差异）。
+            }
+        }
+        return null;
     }
 
     private static void tickPlayer(Minecraft minecraft) {
@@ -333,6 +425,38 @@ public final class EntryItemAutotest {
             return;
         }
         grabScreenshot(minecraft, NARRATION_ZH_SCREENSHOT);
+        // 工单 #17 缺陷 B：单方块使用场景旁白（机器名 / 层级 / 配方类型）必须同样本地化。
+        if (!PonderEntrypoints.openGenerated(SINGLE_BLOCK_TARGET)) {
+            fail(minecraft, "could not open the generated single-block usage scene for " + SINGLE_BLOCK_TARGET);
+            return;
+        }
+        stage = Stage.USAGE_ZH;
+        ticks = 0;
+    }
+
+    /** 单方块使用场景旁白（zh）：seek 到 intro 并断言无原始注册名、机器名 / 层级 / 配方类型均本地化。 */
+    private static void tickUsageZh(Minecraft minecraft) {
+        ScenePlayerScreen player = awaitGeneratedPlayer(minecraft, SINGLE_BLOCK_TARGET);
+        if (player == null) {
+            return;
+        }
+        if (player.renderedFrames() < 4) {
+            return;
+        }
+        seekToStep(player, "intro");
+        if (!assertUsageNarrationLocalized(minecraft, player, "zh")) {
+            return;
+        }
+        stage = Stage.CAPTURE_USAGE_ZH;
+        ticks = 0;
+    }
+
+    /** 等单方块使用旁白帧实际渲染后再截图（同 {@link #tickCaptureZh}）。 */
+    private static void tickCaptureUsageZh(Minecraft minecraft) {
+        if (ticks < 4) {
+            return;
+        }
+        grabScreenshot(minecraft, USAGE_ZH_SCREENSHOT);
         PonderEntrypoints.openCatalog();
         stage = Stage.CATALOG;
         ticks = 0;
@@ -395,6 +519,37 @@ public final class EntryItemAutotest {
             return;
         }
         grabScreenshot(minecraft, NARRATION_EN_SCREENSHOT);
+        if (!PonderEntrypoints.openGenerated(SINGLE_BLOCK_TARGET)) {
+            fail(minecraft, "could not reopen the generated single-block usage scene after switching language");
+            return;
+        }
+        stage = Stage.USAGE_EN;
+        ticks = 0;
+    }
+
+    /** 单方块使用场景旁白（en）：与 {@link #tickUsageZh} 同断言，英文旁白本地化。 */
+    private static void tickUsageEn(Minecraft minecraft) {
+        ScenePlayerScreen player = awaitGeneratedPlayer(minecraft, SINGLE_BLOCK_TARGET);
+        if (player == null) {
+            return;
+        }
+        if (player.renderedFrames() < 4) {
+            return;
+        }
+        seekToStep(player, "intro");
+        if (!assertUsageNarrationLocalized(minecraft, player, "en")) {
+            return;
+        }
+        stage = Stage.CAPTURE_USAGE_EN;
+        ticks = 0;
+    }
+
+    /** 等 en 单方块使用旁白帧实际渲染后再截图。 */
+    private static void tickCaptureUsageEn(Minecraft minecraft) {
+        if (ticks < 4) {
+            return;
+        }
+        grabScreenshot(minecraft, USAGE_EN_SCREENSHOT);
         stage = Stage.GRAB;
         ticks = 0;
     }
@@ -403,10 +558,12 @@ public final class EntryItemAutotest {
         if (ticks < 10) {
             return;
         }
-        LOGGER.info("[GTSNPonder] entryitem autotest PASS: item-hover entry opened '{}'; narration localized "
-                + "zh+en (no raw id / raw role names, halfwidth size parens); catalog row screenshot taken; "
-                + "screenshots {} / {} / {} / {}", HOVER_TARGET, HOVER_SCREENSHOT, NARRATION_ZH_SCREENSHOT,
-                CATALOG_SCREENSHOT, NARRATION_EN_SCREENSHOT);
+        LOGGER.info("[GTSNPonder] entryitem autotest PASS: default ponder key ({}) on a hovered inventory item "
+                + "opened '{}'; narration localized zh+en (multiblock formed + single-block usage, no raw id / "
+                + "raw role names, halfwidth size parens); catalog row screenshot taken; screenshots {} / {} / {} "
+                + "/ {} / {} / {} / {}", postedKeyCode, HOVER_TARGET,
+                HOVER_SCREENSHOT, NARRATION_ZH_SCREENSHOT, USAGE_ZH_SCREENSHOT, CATALOG_SCREENSHOT,
+                NARRATION_EN_SCREENSHOT, USAGE_EN_SCREENSHOT, HOVER_SLOT_SCREENSHOT);
         stage = Stage.DONE;
         ticks = 0;
     }
@@ -442,6 +599,73 @@ public final class EntryItemAutotest {
         player.playback().pause();
         player.playback().seekFraction(1.0d);
         player.advance();
+    }
+
+    /** seek 到指定 id 步骤的起点，暂停并同步一次控件文本（单方块使用旁白的 intro 步）。 */
+    private static void seekToStep(ScenePlayerScreen player, String stepId) {
+        player.playback().pause();
+        List<String> ids = player.playback().stepIds();
+        int index = ids.indexOf(stepId);
+        if (index < 0) {
+            return;
+        }
+        double total = player.playback().totalTime();
+        double start = player.playback().stepStartTime(index);
+        player.playback().seekFraction(total <= 0.0d ? 0.0d : start / total);
+        player.advance();
+    }
+
+    /**
+     * 断言单方块使用场景旁白已本地化（工单 #17 缺陷 B）：不含任何 {@code gtceu:} 原始注册名，且含本地化的
+     * 机器名（GT 方块名键）、层级名（层级键）与配方类型名（配方类型键）。后缀从场景自身的 intro 参数推导，
+     * 不硬编码文案。
+     */
+    private static boolean assertUsageNarrationLocalized(Minecraft minecraft, ScenePlayerScreen player,
+            String locale) {
+        String text = player.narrationText().text();
+        if (text == null || text.isBlank()) {
+            fail(minecraft, locale + " single-block usage narration is blank");
+            return false;
+        }
+        if (text.contains("gtceu:")) {
+            fail(minecraft, locale + " single-block usage narration still shows a raw gtceu: id: " + text);
+            return false;
+        }
+        SceneStep intro = player.scene().steps().stream()
+                .filter(step -> "intro".equals(step.id())).findFirst().orElse(null);
+        if (intro == null) {
+            fail(minecraft, "the single-block usage scene has no intro step");
+            return false;
+        }
+        List<String> args = intro.narrationArgs();
+        if (args.size() < 3) {
+            fail(minecraft, "the single-block usage intro does not carry machine / tier / recipe args: " + args);
+            return false;
+        }
+        String machineName = Component.translatable(SingleBlockUsageGenerator.titleKeyFor(args.get(0))).getString();
+        if (!text.contains(machineName)) {
+            fail(minecraft, locale + " single-block narration lacks the localized machine name '"
+                    + machineName + "': " + text);
+            return false;
+        }
+        String tierName = Component.translatable(GeneratedKeys.tierKey(args.get(1))).getString();
+        if (!text.contains(tierName)) {
+            fail(minecraft, locale + " single-block narration lacks the localized tier name '"
+                    + tierName + "' (raw arg was '" + args.get(1) + "'): " + text);
+            return false;
+        }
+        String recipeTypes = args.get(2);
+        if (recipeTypes.contains(":")) {
+            String firstRecipeType = recipeTypes.split(NarrationLocalization.LIST_SEPARATOR, -1)[0];
+            String recipeName = Component.translatable(GeneratedKeys.recipeTypeKey(firstRecipeType)).getString();
+            if (!text.contains(recipeName)) {
+                fail(minecraft, locale + " single-block narration lacks the localized recipe type name '"
+                        + recipeName + "' (raw arg was '" + firstRecipeType + "'): " + text);
+                return false;
+            }
+        }
+        LOGGER.info("[GTSNPonder] entryitem autotest single-block usage narration [{}]: {}", locale, text);
+        return true;
     }
 
     /**
@@ -561,6 +785,21 @@ public final class EntryItemAutotest {
             return null;
         }
         return server.getPlayerList().getPlayer(minecraft.player.getUUID());
+    }
+
+    /**
+     * 把思索 / 目录快捷键<b>归位到代码默认绑定</b>（工单 #17 缺陷 C 的证据前提）：开发运行目录
+     * {@code run/options.txt} 可能残留早期实验 / 用户改绑（实测残留 {@code Y}/{@code J}），若不归位，
+     * 实机证据反映的是「当前绑定」而非「开箱默认」。归位后本测试的按键证据与 tooltip 提示均对应默认
+     * 绑定（{@code GLFW_KEY_G}）；玩家仍可在「控制」里改绑（不影响本断言之外的行为）。
+     */
+    private static void resetPonderKeybindingsToDefault() {
+        PonderEntrypoints.PONDER_KEY.setKey(PonderEntrypoints.PONDER_KEY.getDefaultKey());
+        PonderEntrypoints.CATALOG_KEY.setKey(PonderEntrypoints.CATALOG_KEY.getDefaultKey());
+        LOGGER.info("[GTSNPonder] entryitem autotest: ponder key reset to default (default={}, bound={}), "
+                + "catalog default={}", PonderEntrypoints.PONDER_KEY.getDefaultKey().getName(),
+                PonderEntrypoints.PONDER_KEY.getKey().getName(),
+                PonderEntrypoints.CATALOG_KEY.getDefaultKey().getName());
     }
 
     private static void prepareWindow(Minecraft minecraft) {

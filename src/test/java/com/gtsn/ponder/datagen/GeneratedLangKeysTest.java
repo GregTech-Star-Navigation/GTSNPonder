@@ -3,9 +3,11 @@ package com.gtsn.ponder.datagen;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.gtsn.ponder.catalog.CatalogKeys;
 import com.gtsn.ponder.catalog.SingleBlockScenes;
 import com.gtsn.ponder.content.SystemSceneKeys;
 import com.gtsn.ponder.generate.GeneratedKeys;
+import com.gtsn.ponder.generate.GtTierNames;
 import com.gtsn.ponder.generate.SceneGenerator;
 import com.gtsn.ponder.generate.SingleBlockUsageGenerator;
 import org.junit.jupiter.api.Test;
@@ -180,9 +182,30 @@ class GeneratedLangKeysTest {
                 "module-slot count template must carry a count placeholder");
     }
 
+    /**
+     * 工单 #17 缺陷 B：GT 电压层级名与机器物品 tooltip 提示键必须经 datagen 产出中英双语且非空白，
+     * 否则单方块旁白会露出裸露层级短码、tooltip 入口不可见。
+     */
     @Test
-    void enumeratesMultiblockMachineTitleKeys() throws IOException {
-        JsonObject en = read(EN, "en_us");
+    void bothLocalesCoverEveryGtTierNameAndMachineItemTooltip() throws IOException {
+        for (Map.Entry<String, JsonObject> locale : Map.of("en_us", read(EN, "en_us"), "zh_cn", read(ZH, "zh_cn"))
+                .entrySet()) {
+            for (GtTierNames.Tier tier : GtTierNames.ALL) {
+                String key = GeneratedKeys.tierKey(tier.code());
+                assertTrue(locale.getValue().has(key),
+                        locale.getKey() + " is missing tier key " + key);
+                assertFalse(locale.getValue().get(key).getAsString().isBlank(), key);
+            }
+            String tooltip = CatalogKeys.MACHINE_ITEM_TOOLTIP;
+            assertTrue(locale.getValue().has(tooltip),
+                    locale.getKey() + " is missing machine item tooltip key " + tooltip);
+            assertTrue(locale.getValue().get(tooltip).getAsString().contains("%s"),
+                    "machine item tooltip must carry the bound-key placeholder: " + tooltip);
+        }
+    }
+
+    @Test
+    void enumeratesMultiblockMachineTitleKeys() throws IOException {        JsonObject en = read(EN, "en_us");
         JsonObject zh = read(ZH, "zh_cn");
 
         boolean hasAnyMachineTitle = en.keySet().stream()
